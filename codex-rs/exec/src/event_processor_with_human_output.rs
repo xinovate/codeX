@@ -435,7 +435,7 @@ fn config_summary_entries(
             summarize_sandbox_policy(config.permissions.sandbox_policy.get()),
         ),
     ];
-    if config.model_provider.wire_api == WireApi::Responses {
+    if matches!(config.model_provider.wire_api, WireApi::Responses | WireApi::Chat) {
         entries.push((
             "reasoning effort",
             config

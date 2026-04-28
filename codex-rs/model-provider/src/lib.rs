@@ -1,6 +1,7 @@
 mod amazon_bedrock;
 mod auth;
 mod bearer_auth_provider;
+mod china_provider;
 mod provider;
 
 pub use bearer_auth_provider::BearerAuthProvider;

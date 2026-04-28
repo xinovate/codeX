@@ -49,6 +49,7 @@ use codex_api::ReqwestTransport;
 use codex_api::ResponseCreateWsRequest;
 use codex_api::ResponsesApiRequest;
 use codex_api::ResponsesClient as ApiResponsesClient;
+use codex_api::ChatCompletionsClient as ApiChatCompletionsClient;
 use codex_api::ResponsesOptions as ApiResponsesOptions;
 use codex_api::ResponsesWebsocketClient as ApiWebSocketResponsesClient;
 use codex_api::ResponsesWebsocketConnection as ApiWebSocketConnection;
@@ -1252,6 +1253,104 @@ impl ModelClientSession {
         }
     }
 
+    /// Streams a turn via the Chat Completions API (Chinese providers).
+    ///
+    /// Uses `ChatCompletionsClient` which transparently converts between
+    /// Responses API (internal) and Chat Completions API (Chinese providers).
+    #[allow(clippy::too_many_arguments)]
+    #[instrument(
+        name = "model_client.stream_chat_completions_api",
+        level = "info",
+        skip_all,
+        fields(
+            model = %model_info.slug,
+            wire_api = "chat",
+            transport = "chat_completions_http",
+            http.method = "POST",
+            api.path = "chat/completions"
+        )
+    )]
+    async fn stream_chat_completions_api(
+        &self,
+        prompt: &Prompt,
+        model_info: &ModelInfo,
+        session_telemetry: &SessionTelemetry,
+        effort: Option<ReasoningEffortConfig>,
+        summary: ReasoningSummaryConfig,
+        service_tier: Option<ServiceTier>,
+        turn_metadata_header: Option<&str>,
+        inference_trace: &InferenceTraceContext,
+    ) -> Result<ResponseStream> {
+        let client_setup = self
+            .client_setup(model_info, session_telemetry)
+            .await?;
+
+        let transport = self.transport();
+        let sse_telemetry = session_telemetry.clone().sse_telemetry();
+        let request_telemetry =
+            codex_client::ReqwestTransportTelemetry::new(
+                self.client.state.auth_env_telemetry.clone(),
+            );
+        let compression = self.responses_request_compression(client_setup.auth.as_ref());
+
+        let request = self.build_responses_request(
+            &client_setup.api_provider,
+            prompt,
+            model_info,
+            effort,
+            summary,
+            service_tier,
+        )?;
+
+        let inference_trace_attempt = inference_trace.start_attempt();
+        inference_trace_attempt.record_started(&request);
+
+        let client = ApiChatCompletionsClient::new(
+            transport,
+            client_setup.api_provider,
+            client_setup.api_auth,
+        )
+        .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
+
+        let extra_headers = self.build_extra_headers(turn_metadata_header, compression);
+
+        let stream_result = client
+            .stream_request(request, extra_headers, compression, /*turn_state*/ None)
+            .await;
+
+        match stream_result {
+            Ok(stream) => {
+                let (stream, _) = map_response_stream(
+                    stream,
+                    session_telemetry.clone(),
+                    inference_trace_attempt,
+                );
+                Ok(stream)
+            }
+            Err(ApiError::Transport(
+                unauthorized_transport @ TransportError::Http { status, .. },
+            )) if status == StatusCode::UNAUTHORIZED => {
+                inference_trace_attempt.record_failed(&unauthorized_transport);
+                Err(map_api_error(ApiError::Transport(unauthorized_transport)))
+            }
+            Err(err) => Err(map_api_error(err)),
+        }
+    }
+
+    fn build_extra_headers(
+        &self,
+        turn_metadata_header: Option<&str>,
+        compression: Compression,
+    ) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        if let Some(header_value) = turn_metadata_header {
+            if let Ok(value) = http::HeaderValue::from_str(header_value) {
+                headers.insert("x-codex-turn-metadata", value);
+            }
+        }
+        headers
+    }
+
     /// Streams a turn via the Responses API over WebSocket transport.
     #[allow(clippy::too_many_arguments)]
     #[instrument(
@@ -1495,6 +1594,19 @@ impl ModelClientSession {
     ) -> Result<ResponseStream> {
         let wire_api = self.client.state.provider.info().wire_api;
         match wire_api {
+            WireApi::Chat => {
+                self.stream_chat_completions_api(
+                    prompt,
+                    model_info,
+                    session_telemetry,
+                    effort,
+                    summary,
+                    service_tier,
+                    turn_metadata_header,
+                    inference_trace,
+                )
+                .await
+            }
             WireApi::Responses => {
                 if self.client.responses_websocket_enabled() {
                     let request_trace = current_span_w3c_trace_context();

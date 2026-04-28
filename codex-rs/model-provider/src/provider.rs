@@ -11,6 +11,7 @@ use codex_model_provider_info::ModelProviderInfo;
 use crate::amazon_bedrock::AmazonBedrockModelProvider;
 use crate::auth::auth_manager_for_provider;
 use crate::auth::resolve_provider_auth;
+use crate::china_provider::ChinaModelProvider;
 
 /// Runtime provider abstraction used by model execution.
 ///
@@ -66,6 +67,17 @@ pub fn create_model_provider(
         return Arc::new(AmazonBedrockModelProvider {
             info: provider_info,
             aws,
+        });
+    }
+
+    if provider_info.is_china_provider() {
+        let mut info = provider_info;
+        // Only auto-set wire_api to Chat if not explicitly configured by user
+        if info.wire_api == codex_model_provider_info::WireApi::Responses {
+            info.wire_api = codex_model_provider_info::WireApi::Chat;
+        }
+        return Arc::new(ChinaModelProvider {
+            info,
         });
     }
 

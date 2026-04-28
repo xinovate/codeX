@@ -48,12 +48,19 @@ pub enum WireApi {
     /// The Responses API exposed by OpenAI at `/v1/responses`.
     #[default]
     Responses,
+    /// The Chat Completions API exposed by OpenAI-compatible providers at `/v1/chat/completions`.
+    ///
+    /// Used for Chinese providers (Volcengine, Doubao, Kimi, etc.) that only
+    /// support Chat Completions, not Responses API. Protocol conversion is
+    /// handled transparently by `ChatCompletionsClient`.
+    Chat,
 }
 
 impl fmt::Display for WireApi {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
             Self::Responses => "responses",
+            Self::Chat => "chat",
         };
         f.write_str(value)
     }
@@ -67,8 +74,8 @@ impl<'de> Deserialize<'de> for WireApi {
         let value = String::deserialize(deserializer)?;
         match value.as_str() {
             "responses" => Ok(Self::Responses),
-            "chat" => Err(serde::de::Error::custom(CHAT_WIRE_API_REMOVED_ERROR)),
-            _ => Err(serde::de::Error::unknown_variant(&value, &["responses"])),
+            "chat" => Ok(Self::Chat),
+            _ => Err(serde::de::Error::unknown_variant(&value, &["responses", "chat"])),
         }
     }
 }
@@ -380,6 +387,28 @@ impl ModelProviderInfo {
 
     pub fn is_amazon_bedrock(&self) -> bool {
         self.name == AMAZON_BEDROCK_PROVIDER_NAME
+    }
+
+    /// Returns true if this provider is a Chinese Chat API provider.
+    ///
+    /// Detection is based on the provider name or base URL containing
+    /// known Chinese provider identifiers.
+    pub fn is_china_provider(&self) -> bool {
+        const CHINA_PROVIDERS: &[&str] = &[
+            "volcengine", "kimi", "doubao", "qwen", "glm",
+            "baichuan", "deepseek", "minimax", "moonshot",
+        ];
+
+        let name_lower = self.name.to_lowercase();
+        let base_url_lower = self
+            .base_url
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+
+        CHINA_PROVIDERS
+            .iter()
+            .any(|&p| name_lower.contains(p) || base_url_lower.contains(p))
     }
 
     pub fn supports_remote_compaction(&self) -> bool {

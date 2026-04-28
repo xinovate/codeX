@@ -1,0 +1,48 @@
+name: Codex China Provider Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Bazel
+        uses: bazelbuild/setup-bazelisk@v2
+
+      - name: Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check Syntax
+        working-directory: ./codex-rs
+        run: cargo check
+
+      - name: Build
+        working-directory: ./codex-rs
+        run: cargo build
+
+      - name: Test Chat Completions
+        working-directory: ./codex-rs
+        run: cargo test --package codex-api chat_completions
+
+      - name: Test China Provider
+        working-directory: ./codex-rs
+        run: cargo test --package model-provider china_provider
+
+      - name: Test Model Provider Info
+        working-directory: ./codex-rs
+        run: cargo test --package codex-model-provider-info china_provider
