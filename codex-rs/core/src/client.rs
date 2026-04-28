@@ -1298,7 +1298,7 @@ impl ModelClientSession {
                 RequestRouteTelemetry::for_endpoint("chat/completions"),
                 self.client.state.auth_env_telemetry.clone(),
             );
-        let compression = self.client.responses_request_compression(client_setup.auth.as_ref());
+        let compression = self.responses_request_compression(client_setup.auth.as_ref());
 
         let request = self.build_responses_request(
             &client_setup.api_provider,
