@@ -1287,8 +1287,8 @@ impl ModelClientSession {
             .await?;
 
         let transport = ReqwestTransport::new(build_reqwest_client());
-        let request_telemetry =
-            Self::build_request_telemetry(
+        let (request_telemetry, sse_telemetry) =
+            Self::build_streaming_telemetry(
                 session_telemetry,
                 AuthRequestTelemetryContext::new(
                     client_setup.auth.as_ref().map(CodexAuth::auth_mode),
@@ -1317,7 +1317,7 @@ impl ModelClientSession {
             client_setup.api_provider,
             client_setup.api_auth,
         )
-        .with_telemetry(Some(request_telemetry), None);
+        .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
 
         let extra_headers = self.build_extra_headers(turn_metadata_header, compression);
 
