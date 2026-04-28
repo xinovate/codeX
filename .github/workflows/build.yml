@@ -15,9 +15,6 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Bazel
-        uses: bazelbuild/setup-bazelisk@v2
-
       - name: Check Syntax
         working-directory: ./codex-rs
         run: cargo check
