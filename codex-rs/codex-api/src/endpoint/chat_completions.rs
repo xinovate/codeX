@@ -472,7 +472,8 @@ mod tests {
 
     #[test]
     fn path_returns_chat_completions() {
-        assert_eq!(ChatCompletionsClient::<()>::path(), "chat/completions");
+        // path() does not depend on T, so we can use ReqwestTransport which implements HttpTransport
+        assert_eq!(ChatCompletionsClient::<codex_client::ReqwestTransport>::path(), "chat/completions");
     }
 
     #[test]
