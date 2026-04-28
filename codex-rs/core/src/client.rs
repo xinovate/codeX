@@ -1282,16 +1282,23 @@ impl ModelClientSession {
         inference_trace: &InferenceTraceContext,
     ) -> Result<ResponseStream> {
         let client_setup = self
-            .client_setup(model_info, session_telemetry)
+            .client
+            .current_client_setup()
             .await?;
 
-        let transport = self.transport();
-        let sse_telemetry = session_telemetry.clone().sse_telemetry();
+        let transport = ReqwestTransport::new(build_reqwest_client());
         let request_telemetry =
-            codex_client::ReqwestTransportTelemetry::new(
+            Self::build_request_telemetry(
+                session_telemetry,
+                AuthRequestTelemetryContext::new(
+                    client_setup.auth.as_ref().map(CodexAuth::auth_mode),
+                    client_setup.api_auth.as_ref(),
+                    PendingUnauthorizedRetry::default(),
+                ),
+                RequestRouteTelemetry::for_endpoint("chat/completions"),
                 self.client.state.auth_env_telemetry.clone(),
             );
-        let compression = self.responses_request_compression(client_setup.auth.as_ref());
+        let compression = self.client.responses_request_compression(client_setup.auth.as_ref());
 
         let request = self.build_responses_request(
             &client_setup.api_provider,
@@ -1310,7 +1317,7 @@ impl ModelClientSession {
             client_setup.api_provider,
             client_setup.api_auth,
         )
-        .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
+        .with_telemetry(Some(request_telemetry), None);
 
         let extra_headers = self.build_extra_headers(turn_metadata_header, compression);
 
@@ -1341,8 +1348,8 @@ impl ModelClientSession {
         &self,
         turn_metadata_header: Option<&str>,
         compression: Compression,
-    ) -> HeaderMap {
-        let mut headers = HeaderMap::new();
+    ) -> ApiHeaderMap {
+        let mut headers = ApiHeaderMap::new();
         if let Some(header_value) = turn_metadata_header {
             if let Ok(value) = http::HeaderValue::from_str(header_value) {
                 headers.insert("x-codex-turn-metadata", value);
