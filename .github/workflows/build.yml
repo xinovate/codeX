@@ -2,7 +2,7 @@ name: Codex China Provider Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, china-provider]
   pull_request:
     branches: [main]
 
