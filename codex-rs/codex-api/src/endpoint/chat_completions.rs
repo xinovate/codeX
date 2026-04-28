@@ -140,7 +140,7 @@ fn spawn_chat_completions_stream(
         let mut response_id: Option<String> = None;
         let mut accumulated_text = String::new();
         let mut item_added_sent = false;
-        let mut last_model: Option<String> = None;
+        let mut _last_model: Option<String> = None;
 
         // Extract model from response headers if available
         if let Some(model) = stream_response
@@ -151,7 +151,7 @@ fn spawn_chat_completions_stream(
             let _ = tx_event
                 .send(Ok(ResponseEvent::ServerModel(model.to_string())))
                 .await;
-            last_model = Some(model.to_string());
+            _last_model = Some(model.to_string());
         }
 
         loop {
@@ -295,7 +295,7 @@ fn spawn_chat_completions_stream(
                     .get("finish_reason")
                     .and_then(|v| v.as_str())
                 {
-                    let status = match finish_reason {
+                    let _status = match finish_reason {
                         "stop" => "completed",
                         "length" => "incomplete",
                         "tool_calls" => "requires_action",
@@ -458,7 +458,8 @@ fn convert_request_body(responses_body: &mut Value) {
     obj.remove("client_metadata");
 
     // 6. Pass through remaining fields (model, temperature, tools, tool_choice, etc.)
-    for (key, value) in obj.drain() {
+    let remaining = std::mem::take(obj);
+    for (key, value) in remaining {
         chat_obj.insert(key, value);
     }
 
