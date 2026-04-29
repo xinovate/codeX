@@ -17,6 +17,7 @@ You can also install via Homebrew (`brew install --cask codex`) or download a pl
 
 - First run with Codex? Start with [`docs/getting-started.md`](../docs/getting-started.md) (links to the walkthrough for prompts, keyboard shortcuts, and session management).
 - Want deeper control? See [`docs/config.md`](../docs/config.md) and [`docs/install.md`](../docs/install.md).
+- Using a Chinese model provider (Volcengine, Kimi, Doubao, etc.)? See [`CHINA_PROVIDER.md`](CHINA_PROVIDER.md) for setup instructions.
 
 ## What's new in the Rust CLI
 
@@ -89,6 +90,12 @@ codex --sandbox danger-full-access
 
 The same setting can be persisted in `~/.codex/config.toml` via the top-level `sandbox_mode = "MODE"` key, e.g. `sandbox_mode = "workspace-write"`.
 In `workspace-write`, Codex also includes `~/.codex/memories` in its writable roots so memory maintenance does not require an extra approval.
+
+### China Provider Support
+
+Codex CLI supports Chinese model providers (Volcengine, Kimi, Doubao, XiaomiMimo, etc.) that use the OpenAI Chat Completions API. The CLI automatically detects these providers and handles protocol conversion from the internal Responses API format.
+
+See [`CHINA_PROVIDER.md`](CHINA_PROVIDER.md) for detailed setup instructions (in Chinese and English).
 
 ## Code Organization
 
