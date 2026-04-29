@@ -16,7 +16,7 @@ The binary will be at `target/release/codex`. Add it to your `PATH` or copy it s
 
 ## China Provider Setup
 
-See [`CHINA_PROVIDER.md`](CHINA_PROVIDER.md) for detailed setup instructions (in Chinese and English).
+See [`codex-rs/CHINA_PROVIDER.md`](codex-rs/CHINA_PROVIDER.md) for detailed setup instructions (in Chinese and English).
 
 Quick start:
 1. Build the binary (see above)
@@ -25,7 +25,7 @@ Quick start:
 
 ## Docs
 
-- [**China Provider Guide**](CHINA_PROVIDER.md)
+- [**China Provider Guide**](codex-rs/CHINA_PROVIDER.md)
 - [**Contributing**](./docs/contributing.md)
 - [**Installing & building**](./docs/install.md)
 
