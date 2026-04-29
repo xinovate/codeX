@@ -130,7 +130,7 @@ fn spawn_chat_completions_stream(
     use eventsource_stream::Eventsource;
     use futures::StreamExt;
     use tokio::sync::mpsc;
-    use tokio::time::{Instant, timeout};
+    use tokio::time::timeout;
 
     let (tx_event, rx_event) = mpsc::channel::<Result<ResponseEvent, ApiError>>(1600);
 
