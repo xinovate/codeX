@@ -37,6 +37,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
       - name: Build
         run: cargo build --release --bin codex --target ${{ matrix.target }}
 
