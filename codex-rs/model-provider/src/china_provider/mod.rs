@@ -9,6 +9,7 @@
 //! - Uses bearer token auth from environment variables
 //! - Signals `WireApi::Chat` so the core client dispatches to `ChatCompletionsClient`
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use codex_api::Provider;
@@ -16,10 +17,16 @@ use codex_api::SharedAuthProvider;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_model_provider_info::ModelProviderInfo;
+use codex_models_manager::collaboration_mode_presets::CollaborationModesConfig;
+use codex_models_manager::manager::SharedModelsManager;
+use codex_models_manager::manager::StaticModelsManager;
 use codex_protocol::error::Result;
+use codex_protocol::openai_models::ModelsResponse;
 
 use crate::bearer_auth_provider::BearerAuthProvider;
 use crate::provider::ModelProvider;
+use crate::provider::ProviderAccountResult;
+use crate::provider::ProviderAccountState;
 
 /// Runtime provider for Chinese platform Chat API endpoints.
 ///
@@ -44,6 +51,13 @@ impl ModelProvider for ChinaModelProvider {
         None
     }
 
+    fn account_state(&self) -> ProviderAccountResult {
+        Ok(ProviderAccountState {
+            account: None,
+            requires_openai_auth: false,
+        })
+    }
+
     async fn api_provider(&self) -> Result<Provider> {
         // Use the configured base_url directly.
         // The ChatCompletionsClient will append /chat/completions.
@@ -60,5 +74,22 @@ impl ModelProvider for ChinaModelProvider {
             account_id: None,
             is_fedramp_account: false,
         }))
+    }
+
+    fn models_manager(
+        &self,
+        _codex_home: PathBuf,
+        config_model_catalog: Option<ModelsResponse>,
+        collaboration_modes_config: CollaborationModesConfig,
+    ) -> SharedModelsManager {
+        // China providers always use static models manager since
+        // the /models endpoint may not be available.
+        let model_catalog = config_model_catalog
+            .unwrap_or_else(|| ModelsResponse { models: vec![] });
+        Arc::new(StaticModelsManager::new(
+            None,
+            model_catalog,
+            collaboration_modes_config,
+        ))
     }
 }

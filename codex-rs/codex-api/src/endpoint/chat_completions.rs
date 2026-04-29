@@ -196,6 +196,7 @@ fn spawn_chat_completions_stream(
                     .send(Ok(ResponseEvent::Completed {
                         response_id: resp_id,
                         token_usage: None,
+                        end_turn: None,
                     }))
                     .await;
                 return;
@@ -462,7 +463,6 @@ fn spawn_chat_completions_stream(
                                     content: vec![codex_protocol::models::ContentItem::OutputText {
                                         text: accumulated_text.clone(),
                                     }],
-                                    end_turn: None,
                                     phase: None,
                                 },
                             )))
@@ -501,6 +501,7 @@ fn spawn_chat_completions_stream(
                         .send(Ok(ResponseEvent::Completed {
                             response_id: response_id.clone().unwrap_or_default(),
                             token_usage,
+                            end_turn: None,
                         }))
                         .await;
 

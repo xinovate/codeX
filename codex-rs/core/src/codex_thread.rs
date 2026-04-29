@@ -1,6 +1,7 @@
 use crate::agent::AgentStatus;
 use crate::config::ConstraintResult;
 use crate::file_watcher::WatchRegistration;
+use crate::goals::GoalRuntimeEvent;
 use crate::session::Codex;
 use crate::session::SessionSettingsUpdate;
 use crate::session::SteerInputError;
@@ -46,13 +47,24 @@ pub struct ThreadConfigSnapshot {
     pub service_tier: Option<ServiceTier>,
     pub approval_policy: AskForApproval,
     pub approvals_reviewer: ApprovalsReviewer,
-    pub sandbox_policy: SandboxPolicy,
     pub permission_profile: PermissionProfile,
     pub cwd: AbsolutePathBuf,
     pub ephemeral: bool,
     pub reasoning_effort: Option<ReasoningEffort>,
     pub personality: Option<Personality>,
     pub session_source: SessionSource,
+}
+
+impl ThreadConfigSnapshot {
+    pub fn sandbox_policy(&self) -> SandboxPolicy {
+        let file_system_sandbox_policy = self.permission_profile.file_system_sandbox_policy();
+        codex_sandboxing::compatibility_sandbox_policy_for_permission_profile(
+            &self.permission_profile,
+            &file_system_sandbox_policy,
+            self.permission_profile.network_sandbox_policy(),
+            self.cwd.as_path(),
+        )
+    }
 }
 
 /// Turn context overrides that app-server validates before starting a turn.
@@ -101,6 +113,53 @@ impl CodexThread {
 
     pub async fn shutdown_and_wait(&self) -> CodexResult<()> {
         self.codex.shutdown_and_wait().await
+    }
+
+    pub async fn apply_goal_resume_runtime_effects(&self) -> anyhow::Result<()> {
+        self.codex
+            .session
+            .goal_runtime_apply(GoalRuntimeEvent::ThreadResumed)
+            .await
+    }
+
+    pub async fn continue_active_goal_if_idle(&self) -> anyhow::Result<()> {
+        self.codex
+            .session
+            .goal_runtime_apply(GoalRuntimeEvent::MaybeContinueIfIdle)
+            .await
+    }
+
+    pub async fn prepare_external_goal_mutation(&self) {
+        if let Err(err) = self
+            .codex
+            .session
+            .goal_runtime_apply(GoalRuntimeEvent::ExternalMutationStarting)
+            .await
+        {
+            tracing::warn!("failed to prepare external goal mutation: {err}");
+        }
+    }
+
+    pub async fn apply_external_goal_set(&self, status: codex_state::ThreadGoalStatus) {
+        if let Err(err) = self
+            .codex
+            .session
+            .goal_runtime_apply(GoalRuntimeEvent::ExternalSet { status })
+            .await
+        {
+            tracing::warn!("failed to apply external goal status runtime effects: {err}");
+        }
+    }
+
+    pub async fn apply_external_goal_clear(&self) {
+        if let Err(err) = self
+            .codex
+            .session
+            .goal_runtime_apply(GoalRuntimeEvent::ExternalClear)
+            .await
+        {
+            tracing::warn!("failed to apply external goal clear runtime effects: {err}");
+        }
     }
 
     #[doc(hidden)]
@@ -230,7 +289,6 @@ impl CodexThread {
             id: None,
             role: "user".to_string(),
             content: vec![ContentItem::InputText { text: message }],
-            end_turn: None,
             phase: None,
         };
         let pending_item = match pending_message_input_item(&message) {
