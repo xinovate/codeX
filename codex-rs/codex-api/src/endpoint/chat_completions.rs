@@ -672,11 +672,6 @@ fn convert_request_body(responses_body: &mut Value) {
             }
         }
 
-        // Debug: log all message roles
-        for (i, msg) in messages.iter().enumerate() {
-            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
-            tracing::debug!("chat_completions: messages[{i}] role={role}");
-        }
         chat_obj.insert("messages".to_string(), Value::Array(messages));
     }
 
