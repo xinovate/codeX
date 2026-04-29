@@ -406,16 +406,21 @@ fn spawn_chat_completions_stream(
 /// Convert Responses API content item types to Chat Completions API types.
 ///
 /// - `input_text` → `text`
+/// - `output_text` → `text`
 /// - `input_image` → `image_url`
 fn convert_content_types(content: &mut Value) {
     if let Some(arr) = content.as_array_mut() {
         for item in arr {
             if let Some(obj) = item.as_object_mut() {
                 if let Some(t) = obj.get_mut("type") {
-                    if t.as_str() == Some("input_text") {
-                        *t = Value::String("text".to_string());
-                    } else if t.as_str() == Some("input_image") {
-                        *t = Value::String("image_url".to_string());
+                    match t.as_str() {
+                        Some("input_text" | "output_text") => {
+                            *t = Value::String("text".to_string());
+                        }
+                        Some("input_image") => {
+                            *t = Value::String("image_url".to_string());
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -632,21 +637,25 @@ mod tests {
     fn converts_content_item_types() {
         let mut body = json!({
             "model": "test",
-            "input": [{
-                "role": "user",
-                "content": [
+            "input": [
+                {"role": "user", "content": [
                     {"type": "input_text", "text": "Hello"},
                     {"type": "input_image", "image_url": "http://example.com/img.png"}
-                ]
-            }],
+                ]},
+                {"role": "assistant", "content": [
+                    {"type": "output_text", "text": "Hi there"}
+                ]}
+            ],
         });
 
         convert_request_body(&mut body);
 
         let messages = body["messages"].as_array().unwrap();
-        let content = messages[0]["content"].as_array().unwrap();
-        assert_eq!(content[0]["type"], "text");
-        assert_eq!(content[1]["type"], "image_url");
+        let user_content = messages[0]["content"].as_array().unwrap();
+        assert_eq!(user_content[0]["type"], "text");
+        assert_eq!(user_content[1]["type"], "image_url");
+        let assistant_content = messages[1]["content"].as_array().unwrap();
+        assert_eq!(assistant_content[0]["type"], "text");
     }
 
     #[test]
