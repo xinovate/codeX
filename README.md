@@ -2,71 +2,40 @@
 
 A fork of OpenAI's Codex CLI with built-in support for Chinese model providers (Volcengine, Kimi, Doubao, XiaomiMimo, etc.) that use the OpenAI Chat Completions API.
 
-## 环境准备 / Prerequisites
+## 安装 / Install
 
-### 1. 安装 Git
+### 方式一：下载预编译二进制（推荐）
+
+从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载对应平台的二进制文件：
+
+| 平台 | 文件 |
+|------|------|
+| macOS (Apple Silicon) | `codex-aarch64-apple-darwin.tar.gz` |
+| macOS (Intel) | `codex-x86_64-apple-darwin.tar.gz` |
+| Linux (x86_64) | `codex-x86_64-unknown-linux-musl.tar.gz` |
+| Linux (ARM64) | `codex-aarch64-unknown-linux-musl.tar.gz` |
 
 ```shell
-# macOS (已预装，或通过 Homebrew)
-brew install git
-
-# Ubuntu/Debian
-sudo apt install git
-
-# Windows
-# 下载安装 https://git-scm.com/download/win
+# 示例：macOS Apple Silicon
+tar xzf codex-aarch64-apple-darwin.tar.gz
+sudo mv codex /usr/local/bin/
 ```
 
-### 2. 安装 Rust 工具链
+### 方式二：从源码构建
 
-Codex CLI 是 Rust 项目，需要安装 Rust 编译器和 Cargo 包管理器。
+需要先安装 [Rust](https://rustup.rs/)：
 
 ```shell
-# macOS / Linux
+# 安装 Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env
 
-# Windows
-# 下载安装 https://win.rustup.rs/
-```
-
-验证安装：
-
-```shell
-rustc --version
-cargo --version
-```
-
-### 3. 系统依赖 (仅 Linux)
-
-```shell
-# Ubuntu/Debian
-sudo apt update
-sudo apt install -y build-essential pkg-config libssl-dev
-
-# CentOS/RHEL/Fedora
-sudo yum install -y gcc openssl-devel pkgconfig
-```
-
-macOS 和 Windows 通常不需要额外依赖。
-
-## 构建 / Build
-
-```shell
+# 构建
 git clone https://github.com/xinovate/codex.git
 cd codex/codex-rs
 cargo build --release --bin codex
-```
 
-构建完成后，二进制文件在 `target/release/codex`。
-
-### 配置 PATH
-
-```shell
-# macOS / Linux - 添加到 ~/.bashrc 或 ~/.zshrc
-export PATH="$HOME/codex/codex-rs/target/release:$PATH"
-
-# 或者复制到系统目录
+# 安装
 sudo cp target/release/codex /usr/local/bin/
 ```
 
