@@ -498,6 +498,8 @@ fn convert_request_body(responses_body: &mut Value) {
     obj.remove("prompt_cache_key");
     obj.remove("service_tier");
     obj.remove("client_metadata");
+    obj.remove("reasoning");
+    obj.remove("parallel_tool_calls");
 
     // 6. Convert tools from Responses API format to Chat Completions format
     //    Responses:  {"type":"function", "name":"x", "description":"...", "parameters":{...}}
