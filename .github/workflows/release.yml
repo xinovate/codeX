@@ -46,12 +46,11 @@ jobs:
         run: |
           cd target/release
           tar czf codex-${{ matrix.target }}.tar.gz codex
-          mv codex-${{ matrix.target }}.tar.gz ../../../
 
       - uses: actions/upload-artifact@v4
         with:
           name: codex-${{ matrix.target }}
-          path: codex-rs/codex-${{ matrix.target }}.tar.gz
+          path: codex-rs/target/release/codex-${{ matrix.target }}.tar.gz
 
   release:
     needs: build
