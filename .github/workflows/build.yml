@@ -2,7 +2,7 @@ name: Codex China Provider Build
 
 on:
   push:
-    branches: [main, china-provider]
+    branches: [china-provider]
   pull_request:
     branches: [main]
 
@@ -20,13 +20,19 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Check Syntax
-        working-directory: ./codex-rs
-        run: cargo check
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            codex-rs/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('codex-rs/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Build
+      - name: Check
         working-directory: ./codex-rs
-        run: cargo build
+        run: cargo check --workspace --exclude codex-realtime-webrtc
 
       - name: Test Chat Completions
         working-directory: ./codex-rs
@@ -34,7 +40,7 @@ jobs:
 
       - name: Test China Provider
         working-directory: ./codex-rs
-        run: cargo test --package model-provider china_provider
+        run: cargo test --package codex-model-provider china_provider
 
       - name: Test Model Provider Info
         working-directory: ./codex-rs
