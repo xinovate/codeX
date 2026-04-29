@@ -403,6 +403,26 @@ fn spawn_chat_completions_stream(
 // Protocol conversion: Responses API → Chat Completions API
 // ============================================================
 
+/// Convert Responses API content item types to Chat Completions API types.
+///
+/// - `input_text` → `text`
+/// - `input_image` → `image_url`
+fn convert_content_types(content: &mut Value) {
+    if let Some(arr) = content.as_array_mut() {
+        for item in arr {
+            if let Some(obj) = item.as_object_mut() {
+                if let Some(t) = obj.get_mut("type") {
+                    if t.as_str() == Some("input_text") {
+                        *t = Value::String("text".to_string());
+                    } else if t.as_str() == Some("input_image") {
+                        *t = Value::String("image_url".to_string());
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Convert a Responses API request body to a Chat Completions API request body.
 ///
 /// This is the same logic as `model-provider-info::china_provider_conversions`,
@@ -423,7 +443,24 @@ fn convert_request_body(responses_body: &mut Value) {
             vec![input]
         };
 
-        // 2. Prepend instructions as system message
+        // 2. Convert "developer" role to "system" (Responses API uses "developer",
+        //    but Chat Completions API only supports "system"/"user"/"assistant"/"tool")
+        //    Also convert content item types: "input_text" → "text", "input_image" → "image_url"
+        for msg in &mut messages {
+            if let Some(obj) = msg.as_object_mut() {
+                if let Some(role) = obj.get_mut("role") {
+                    if role.as_str() == Some("developer") {
+                        *role = Value::String("system".to_string());
+                    }
+                }
+                // Convert content item types within arrays
+                if let Some(content) = obj.get_mut("content") {
+                    convert_content_types(content);
+                }
+            }
+        }
+
+        // 3. Prepend instructions as system message
         if let Some(instructions) = obj.remove("instructions") {
             if let Some(text) = instructions.as_str() {
                 if !text.is_empty() {
@@ -457,7 +494,46 @@ fn convert_request_body(responses_body: &mut Value) {
     obj.remove("service_tier");
     obj.remove("client_metadata");
 
-    // 6. Pass through remaining fields (model, temperature, tools, tool_choice, etc.)
+    // 6. Convert tools from Responses API format to Chat Completions format
+    //    Responses:  {"type":"function", "name":"x", "description":"...", "parameters":{...}}
+    //    Chat:      {"type":"function", "function":{"name":"x", "description":"...", "parameters":{...}}}
+    if let Some(tools) = obj.remove("tools") {
+        if let Some(arr) = tools.as_array() {
+            let converted: Vec<Value> = arr
+                .iter()
+                .filter_map(|tool| {
+                    if let Some(t) = tool.as_object() {
+                        if t.get("type").and_then(|v| v.as_str()) == Some("function") {
+                            // Move name/description/parameters/strict into a nested "function" object
+                            let func = json!({
+                                "name": t.get("name").cloned().unwrap_or(Value::Null),
+                                "description": t.get("description").cloned().unwrap_or(Value::Null),
+                                "parameters": t.get("parameters").cloned().unwrap_or(Value::Null),
+                                "strict": t.get("strict").cloned().unwrap_or(Value::Null),
+                            });
+                            let mut chat_tool = json!({"type": "function", "function": func});
+                            if let Some(obj) = chat_tool.as_object_mut() {
+                                for (k, v) in t {
+                                    if !matches!(k.as_str(), "type" | "name" | "description" | "parameters" | "strict") {
+                                        obj.insert(k.clone(), v.clone());
+                                    }
+                                }
+                            }
+                            return Some(chat_tool);
+                        }
+                    }
+                    // Drop non-function tools (local_shell, web_search, etc.)
+                    // Chat Completions API only supports type:"function"
+                    None
+                })
+                .collect();
+            chat_obj.insert("tools".to_string(), Value::Array(converted));
+        } else {
+            chat_obj.insert("tools".to_string(), tools);
+        }
+    }
+
+    // 7. Pass through remaining fields (model, temperature, tool_choice, etc.)
     let remaining = std::mem::take(obj);
     for (key, value) in remaining {
         chat_obj.insert(key, value);
@@ -517,14 +593,23 @@ mod tests {
         let mut body = json!({
             "model": "test",
             "input": [{"role": "user", "content": "What's the weather?"}],
-            "tools": [{"type": "function", "function": {"name": "get_weather"}}],
+            "tools": [{"type": "function", "name": "get_weather", "description": "Get weather", "parameters": {"type": "object"}, "strict": false}],
             "tool_choice": "auto",
             "temperature": 0.7,
         });
 
         convert_request_body(&mut body);
 
-        assert!(body.get("tools").is_some());
+        let tools = body["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0]["type"], "function");
+        // Should be nested in "function" object for Chat Completions API
+        assert_eq!(tools[0]["function"]["name"], "get_weather");
+        assert_eq!(tools[0]["function"]["description"], "Get weather");
+        assert_eq!(tools[0]["function"]["parameters"]["type"], "object");
+        // Top-level name/description/parameters should be gone
+        assert!(tools[0].get("name").is_none());
+        assert!(tools[0].get("description").is_none());
         assert_eq!(body["tool_choice"], "auto");
         assert_eq!(body["temperature"], 0.7);
     }
@@ -541,6 +626,45 @@ mod tests {
 
         assert_eq!(body["response_format"], json!({"type": "json_object"}));
         assert!(body.get("text").is_none());
+    }
+
+    #[test]
+    fn converts_content_item_types() {
+        let mut body = json!({
+            "model": "test",
+            "input": [{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "Hello"},
+                    {"type": "input_image", "image_url": "http://example.com/img.png"}
+                ]
+            }],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        let content = messages[0]["content"].as_array().unwrap();
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[1]["type"], "image_url");
+    }
+
+    #[test]
+    fn converts_developer_role_to_system() {
+        let mut body = json!({
+            "model": "test",
+            "input": [
+                {"role": "developer", "content": "You are helpful."},
+                {"role": "user", "content": "Hi"}
+            ],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages[0]["role"], "system");
+        assert_eq!(messages[0]["content"], "You are helpful.");
+        assert_eq!(messages[1]["role"], "user");
     }
 
     #[test]
