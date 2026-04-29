@@ -451,6 +451,7 @@ fn convert_request_body(responses_body: &mut Value) {
         // 2. Convert "developer" role to "system" (Responses API uses "developer",
         //    but Chat Completions API only supports "system"/"user"/"assistant"/"tool")
         //    Also convert content item types: "input_text" → "text", "input_image" → "image_url"
+        //    For assistant messages, flatten content array to a plain string.
         for msg in &mut messages {
             if let Some(obj) = msg.as_object_mut() {
                 if let Some(role) = obj.get_mut("role") {
@@ -458,9 +459,32 @@ fn convert_request_body(responses_body: &mut Value) {
                         *role = Value::String("system".to_string());
                     }
                 }
+                let is_assistant = obj.get("role").and_then(|r| r.as_str()) == Some("assistant");
+
                 // Convert content item types within arrays
                 if let Some(content) = obj.get_mut("content") {
                     convert_content_types(content);
+
+                    // For assistant messages, flatten content array to plain string.
+                    // Chat Completions API expects assistant content to be a string,
+                    // not an array of content items.
+                    if is_assistant {
+                        if let Some(arr) = content.as_array() {
+                            let text: String = arr
+                                .iter()
+                                .filter_map(|item| {
+                                    if item.get("type").and_then(|t| t.as_str()) == Some("text") {
+                                        item.get("text").and_then(|t| t.as_str())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            if !text.is_empty() {
+                                *content = Value::String(text);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -656,8 +680,8 @@ mod tests {
         let user_content = messages[0]["content"].as_array().unwrap();
         assert_eq!(user_content[0]["type"], "text");
         assert_eq!(user_content[1]["type"], "image_url");
-        let assistant_content = messages[1]["content"].as_array().unwrap();
-        assert_eq!(assistant_content[0]["type"], "text");
+        // Assistant content should be flattened to a plain string
+        assert_eq!(messages[1]["content"], "Hi there");
     }
 
     #[test]
@@ -704,5 +728,29 @@ mod tests {
 
         assert!(body.get("messages").is_none());
         assert_eq!(body["max_tokens"], 50);
+    }
+
+    #[test]
+    fn flattens_assistant_content_to_string() {
+        let mut body = json!({
+            "model": "test",
+            "input": [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": [
+                    {"type": "output_text", "text": "Part 1. "},
+                    {"type": "output_text", "text": "Part 2."}
+                ]},
+                {"role": "user", "content": "Follow up"}
+            ],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        // User messages stay as-is
+        assert_eq!(messages[0]["content"], "Hello");
+        // Assistant content flattened to single string
+        assert_eq!(messages[1]["content"], "Part 1. Part 2.");
+        assert_eq!(messages[2]["content"], "Follow up");
     }
 }
