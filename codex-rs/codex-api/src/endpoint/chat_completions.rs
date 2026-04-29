@@ -234,7 +234,6 @@ fn spawn_chat_completions_stream(
                                             id: None,
                                             role: "assistant".to_string(),
                                             content: vec![],
-                                            end_turn: None,
                                             phase: None,
                                         },
                                     )))
@@ -263,7 +262,6 @@ fn spawn_chat_completions_stream(
                                             id: None,
                                             role: "assistant".to_string(),
                                             content: vec![],
-                                            end_turn: None,
                                             phase: None,
                                         },
                                     )))
@@ -449,7 +447,6 @@ fn spawn_chat_completions_stream(
                                         id: None,
                                         role: "assistant".to_string(),
                                         content: vec![],
-                                        end_turn: None,
                                         phase: None,
                                     },
                                 )))
