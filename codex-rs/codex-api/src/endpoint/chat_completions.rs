@@ -139,8 +139,13 @@ fn spawn_chat_completions_stream(
         let mut event_stream = stream.eventsource();
         let mut response_id: Option<String> = None;
         let mut accumulated_text = String::new();
-        let mut item_added_sent = false;
+        let mut message_item_added = false;
         let mut _last_model: Option<String> = None;
+
+        // Accumulate tool call state from streaming deltas.
+        // Key: tool call index, Value: (id, name, arguments, item_added_sent)
+        let mut tool_calls: std::collections::HashMap<i64, (String, String, String, bool)> =
+            std::collections::HashMap::new();
 
         // Extract model from response headers if available
         if let Some(model) = stream_response
@@ -217,27 +222,24 @@ fn spawn_chat_completions_stream(
                 .and_then(|a| a.first())
             {
                 if let Some(delta) = choices.get("delta") {
-                    // Role → output_item.added
-                    if let Some(role) = delta.get("role").and_then(|v| v.as_str()) {
-                        if !item_added_sent {
-                            let _ = tx_event
-                                .send(Ok(ResponseEvent::OutputItemAdded(
-                                    codex_protocol::models::ResponseItem::Message {
-                                        id: None,
-                                        role: role.to_string(),
-                                        content: vec![],
-                                        end_turn: None,
-                                        phase: None,
-                                    },
-                                )))
-                                .await;
-                            item_added_sent = true;
-                        }
-                    }
-
                     // Content → output_text.delta
                     if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
                         if !content.is_empty() {
+                            // Emit message item added on first text content
+                            if !message_item_added {
+                                let _ = tx_event
+                                    .send(Ok(ResponseEvent::OutputItemAdded(
+                                        codex_protocol::models::ResponseItem::Message {
+                                            id: None,
+                                            role: "assistant".to_string(),
+                                            content: vec![],
+                                            end_turn: None,
+                                            phase: None,
+                                        },
+                                    )))
+                                    .await;
+                                message_item_added = true;
+                            }
                             accumulated_text.push_str(content);
                             let _ = tx_event
                                 .send(Ok(ResponseEvent::OutputTextDelta(
@@ -252,6 +254,21 @@ fn spawn_chat_completions_stream(
                         delta.get("reasoning_content").and_then(|v| v.as_str())
                     {
                         if !reasoning.is_empty() {
+                            // Ensure message item is added before reasoning delta
+                            if !message_item_added {
+                                let _ = tx_event
+                                    .send(Ok(ResponseEvent::OutputItemAdded(
+                                        codex_protocol::models::ResponseItem::Message {
+                                            id: None,
+                                            role: "assistant".to_string(),
+                                            content: vec![],
+                                            end_turn: None,
+                                            phase: None,
+                                        },
+                                    )))
+                                    .await;
+                                message_item_added = true;
+                            }
                             let _ = tx_event
                                 .send(Ok(ResponseEvent::ReasoningContentDelta {
                                     delta: reasoning.to_string(),
@@ -261,27 +278,70 @@ fn spawn_chat_completions_stream(
                         }
                     }
 
-                    // Tool calls delta → function_call_arguments.delta
-                    // TODO: Full tool call streaming support requires emitting
-                    // OutputItemAdded(FunctionCall) before the first delta, and
-                    // OutputItemDone(FunctionCall) after the last delta.
-                    // For now, we emit ToolCallInputDelta which the core session
-                    // can handle if an active_tool_argument_diff_consumer is set.
-                    if let Some(tool_calls) = delta.get("tool_calls") {
-                        if let Some(arr) = tool_calls.as_array() {
+                    // Accumulate tool call deltas and emit proper events
+                    if let Some(tc_deltas) = delta.get("tool_calls") {
+                        if let Some(arr) = tc_deltas.as_array() {
                             for tc in arr {
-                                if let Some(index) = tc.get("index").and_then(|v| v.as_i64()) {
+                                let index = match tc.get("index").and_then(|v| v.as_i64()) {
+                                    Some(i) => i,
+                                    None => continue,
+                                };
+
+                                let entry = tool_calls.entry(index).or_insert_with(|| {
+                                    (String::new(), String::new(), String::new(), false)
+                                });
+
+                                // Update id if present (first chunk for this tool call)
+                                if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
+                                    entry.0 = id.to_string();
+                                }
+
+                                // Update name if present (first chunk for this tool call)
+                                if let Some(name) = tc
+                                    .get("function")
+                                    .and_then(|f| f.get("name"))
+                                    .and_then(|v| v.as_str())
+                                {
+                                    entry.1 = name.to_string();
+                                }
+
+                                // Accumulate arguments
+                                if let Some(args) = tc
+                                    .get("function")
+                                    .and_then(|f| f.get("arguments"))
+                                    .and_then(|v| v.as_str())
+                                {
+                                    entry.2.push_str(args);
+                                }
+
+                                // Emit OutputItemAdded(FunctionCall) on first delta for this tool call
+                                if !entry.3 {
+                                    entry.3 = true;
+                                    let _ = tx_event
+                                        .send(Ok(ResponseEvent::OutputItemAdded(
+                                            codex_protocol::models::ResponseItem::FunctionCall {
+                                                id: None,
+                                                name: entry.1.clone(),
+                                                namespace: None,
+                                                arguments: String::new(),
+                                                call_id: entry.0.clone(),
+                                            },
+                                        )))
+                                        .await;
+                                }
+
+                                // Emit argument delta
+                                let delta_args = tc
+                                    .get("function")
+                                    .and_then(|f| f.get("arguments"))
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("");
+                                if !delta_args.is_empty() {
                                     let _ = tx_event
                                         .send(Ok(ResponseEvent::ToolCallInputDelta {
                                             item_id: format!("tool_call_{index}"),
-                                            call_id: tc.get("id")
-                                                .and_then(|v| v.as_str())
-                                                .map(String::from),
-                                            delta: tc.get("function")
-                                                .and_then(|f| f.get("arguments"))
-                                                .and_then(|v| v.as_str())
-                                                .unwrap_or("")
-                                                .to_string(),
+                                            call_id: Some(entry.0.clone()),
+                                            delta: delta_args.to_string(),
                                         }))
                                         .await;
                                 }
@@ -302,44 +362,98 @@ fn spawn_chat_completions_stream(
                         _ => "completed",
                     };
 
-                    // Check if this is a tool_calls response with complete tool_calls info
                     if finish_reason == "tool_calls" {
-                        if let Some(message) = choices.get("message") {
-                            if let Some(tool_calls) = message.get("tool_calls") {
-                                if let Some(arr) = tool_calls.as_array() {
-                                    for tc in arr {
-                                        let id = tc.get("id")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("")
-                                            .to_string();
-                                        let name = tc.get("function")
-                                            .and_then(|f| f.get("name"))
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("")
-                                            .to_string();
-                                        let arguments = tc.get("function")
-                                            .and_then(|f| f.get("arguments"))
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("")
-                                            .to_string();
+                        // For tool call responses: close any open message first,
+                        // then emit OutputItemDone(FunctionCall) for each tool call.
 
-                                        let _ = tx_event
-                                            .send(Ok(ResponseEvent::OutputItemDone(
-                                                codex_protocol::models::ResponseItem::FunctionCall {
-                                                    id: None,
-                                                    name,
-                                                    namespace: None,
-                                                    arguments,
-                                                    call_id: id,
-                                                },
-                                            )))
-                                            .await;
+                        // Try to get tool calls from message.tool_calls (non-streaming)
+                        // or fall back to accumulated streaming state.
+                        let final_tool_calls: Vec<(String, String, String)> =
+                            if let Some(message) = choices.get("message") {
+                                if let Some(tcs) = message.get("tool_calls") {
+                                    if let Some(arr) = tcs.as_array() {
+                                        arr.iter()
+                                            .map(|tc| {
+                                                let id = tc
+                                                    .get("id")
+                                                    .and_then(|v| v.as_str())
+                                                    .unwrap_or("")
+                                                    .to_string();
+                                                let name = tc
+                                                    .get("function")
+                                                    .and_then(|f| f.get("name"))
+                                                    .and_then(|v| v.as_str())
+                                                    .unwrap_or("")
+                                                    .to_string();
+                                                let arguments = tc
+                                                    .get("function")
+                                                    .and_then(|f| f.get("arguments"))
+                                                    .and_then(|v| v.as_str())
+                                                    .unwrap_or("")
+                                                    .to_string();
+                                                (id, name, arguments)
+                                            })
+                                            .collect()
+                                    } else {
+                                        Vec::new()
                                     }
+                                } else {
+                                    Vec::new()
                                 }
+                            } else {
+                                Vec::new()
+                            };
+
+                        // Use message.tool_calls if available, otherwise fall back
+                        // to accumulated streaming state
+                        if !final_tool_calls.is_empty() {
+                            for (id, name, arguments) in final_tool_calls {
+                                let _ = tx_event
+                                    .send(Ok(ResponseEvent::OutputItemDone(
+                                        codex_protocol::models::ResponseItem::FunctionCall {
+                                            id: None,
+                                            name,
+                                            namespace: None,
+                                            arguments,
+                                            call_id: id,
+                                        },
+                                    )))
+                                    .await;
+                            }
+                        } else {
+                            // Fall back to accumulated state from streaming deltas
+                            let mut sorted: Vec<_> = tool_calls.iter().collect();
+                            sorted.sort_by_key(|(k, _)| **k);
+                            for (_, (id, name, arguments, _)) in sorted {
+                                let _ = tx_event
+                                    .send(Ok(ResponseEvent::OutputItemDone(
+                                        codex_protocol::models::ResponseItem::FunctionCall {
+                                            id: None,
+                                            name: name.clone(),
+                                            namespace: None,
+                                            arguments: arguments.clone(),
+                                            call_id: id.clone(),
+                                        },
+                                    )))
+                                    .await;
                             }
                         }
                     } else {
                         // Emit output_item.done for regular message
+                        if !message_item_added {
+                            // If we never sent OutputItemAdded(Message), send it now
+                            let _ = tx_event
+                                .send(Ok(ResponseEvent::OutputItemAdded(
+                                    codex_protocol::models::ResponseItem::Message {
+                                        id: None,
+                                        role: "assistant".to_string(),
+                                        content: vec![],
+                                        end_turn: None,
+                                        phase: None,
+                                    },
+                                )))
+                                .await;
+                        }
                         let _ = tx_event
                             .send(Ok(ResponseEvent::OutputItemDone(
                                 codex_protocol::models::ResponseItem::Message {
@@ -448,15 +562,72 @@ fn convert_request_body(responses_body: &mut Value) {
             vec![input]
         };
 
-        // 2. Convert "developer" role to "system" (Responses API uses "developer",
-        //    but Chat Completions API only supports "system"/"user"/"assistant"/"tool")
-        //    Also convert content item types: "input_text" → "text", "input_image" → "image_url"
-        //    For assistant messages, flatten content array to a plain string.
+        // 2. Convert Responses API item types to Chat Completions messages.
+        //    Responses API uses "function_call" and "function_call_output" types
+        //    that have no "role" field — convert them to standard message format.
+        //    Also handle role conversions and content type conversions.
         for msg in &mut messages {
             if let Some(obj) = msg.as_object_mut() {
+                // Handle Responses API function_call items (no role field)
+                let msg_type = obj.get("type").and_then(|v| v.as_str());
+                if msg_type == Some("function_call") {
+                    // Convert to assistant message with tool_calls
+                    let call_id = obj.get("call_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let arguments = obj.get("arguments").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    *obj = Map::new();
+                    obj.insert("role".to_string(), Value::String("assistant".to_string()));
+                    obj.insert("content".to_string(), Value::Null);
+                    obj.insert("tool_calls".to_string(), json!([{
+                        "id": call_id,
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "arguments": arguments
+                        }
+                    }]));
+                    continue;
+                }
+                if msg_type == Some("function_call_output") {
+                    // Convert to user message with tool output (since some providers
+                    // don't support "tool" role)
+                    let call_id = obj.get("call_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let output = obj.get("output").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    *obj = Map::new();
+                    obj.insert("role".to_string(), Value::String("user".to_string()));
+                    obj.insert("content".to_string(),
+                        Value::String(format!("[Tool result for {call_id}]\n{output}")));
+                    continue;
+                }
+
                 if let Some(role) = obj.get_mut("role") {
                     if role.as_str() == Some("developer") {
                         *role = Value::String("system".to_string());
+                    }
+                    // Some providers don't support "tool" role — convert to "user"
+                    // and prepend tool_call_id info to content
+                    if role.as_str() == Some("tool") {
+                        *role = Value::String("user".to_string());
+                        // Clone call_id to avoid borrow conflict
+                        let call_id = obj
+                            .get("tool_call_id")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+                        if let Some(content) = obj.get_mut("content") {
+                            let prefix = call_id
+                                .map(|id| format!("[Tool result for {id}]\n"))
+                                .unwrap_or_default();
+                            if let Some(s) = content.as_str() {
+                                *content = Value::String(format!("{prefix}{s}"));
+                            } else if let Some(arr) = content.as_array() {
+                                // Extract text from content items
+                                let text: String = arr
+                                    .iter()
+                                    .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
+                                    .collect();
+                                *content = Value::String(format!("{prefix}{text}"));
+                            }
+                        }
                     }
                 }
                 let is_assistant = obj.get("role").and_then(|r| r.as_str()) == Some("assistant");
@@ -501,6 +672,11 @@ fn convert_request_body(responses_body: &mut Value) {
             }
         }
 
+        // Debug: log all message roles
+        for (i, msg) in messages.iter().enumerate() {
+            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+            tracing::debug!("chat_completions: messages[{i}] role={role}");
+        }
         chat_obj.insert("messages".to_string(), Value::Array(messages));
     }
 
@@ -752,5 +928,30 @@ mod tests {
         // Assistant content flattened to single string
         assert_eq!(messages[1]["content"], "Part 1. Part 2.");
         assert_eq!(messages[2]["content"], "Follow up");
+    }
+
+    #[test]
+    fn converts_tool_role_to_user() {
+        let mut body = json!({
+            "model": "test",
+            "input": [
+                {"role": "user", "content": "list files"},
+                {"role": "assistant", "content": [
+                    {"type": "output_text", "text": "I'll list the files."}
+                ], "tool_calls": [{"id": "call_123", "type": "function", "function": {"name": "exec", "arguments": "{\"cmd\":\"ls\"}"}}]},
+                {"role": "tool", "tool_call_id": "call_123", "content": "file1.txt\nfile2.txt"}
+            ],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages[0]["role"], "user");
+        assert_eq!(messages[1]["role"], "assistant");
+        // Tool role should be converted to user
+        assert_eq!(messages[2]["role"], "user");
+        // Content should include tool_call_id prefix
+        assert!(messages[2]["content"].as_str().unwrap().contains("call_123"));
+        assert!(messages[2]["content"].as_str().unwrap().contains("file1.txt"));
     }
 }
