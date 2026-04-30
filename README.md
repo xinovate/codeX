@@ -6,7 +6,7 @@ A fork of OpenAI's Codex CLI (based on commit `7d72fc8f5`, 2026-04-28) with buil
 
 ### Linux
 
-Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases). No Rust installation required.
+Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codeX/releases). No Rust installation required.
 
 #### 1. Download and Extract
 
@@ -14,10 +14,10 @@ Choose the package matching your CPU architecture:
 
 ```shell
 # x86_64 (most Intel/AMD computers)
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-x64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codeX/releases/download/v0.1.2/codex-linux-x64.tar.gz | tar xz
 
 # ARM64 (Raspberry Pi, Apple Silicon VMs, etc.)
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-arm64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codeX/releases/download/v0.1.2/codex-linux-arm64.tar.gz | tar xz
 ```
 
 Not sure about your architecture? Run `uname -m` -- `x86_64` means x64, `aarch64` means arm64.
@@ -84,7 +84,7 @@ codex exec "Write a Hello World in Python"
 
 ### Windows
 
-Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases). No Rust installation required.
+Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codeX/releases). No Rust installation required.
 
 #### 1. Download and Extract
 
@@ -156,7 +156,7 @@ codex exec "Write a Hello World in Python"
 
 ### macOS
 
-Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases). No Rust installation required.
+Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codeX/releases). No Rust installation required.
 
 #### 1. Download and Extract
 
@@ -164,10 +164,10 @@ Choose the package matching your CPU architecture:
 
 ```shell
 # Apple Silicon (M1/M2/M3/M4)
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-arm64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codeX/releases/download/v0.1.2/codex-macos-arm64.tar.gz | tar xz
 
 # Intel
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-x64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codeX/releases/download/v0.1.2/codex-macos-x64.tar.gz | tar xz
 ```
 
 Not sure? Run `uname -m`. If it says `arm64`, use arm64; if `x86_64`, use x64.

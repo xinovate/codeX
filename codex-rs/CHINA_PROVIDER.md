@@ -19,7 +19,7 @@
 
 **方式一：下载预编译二进制（推荐）**
 
-从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载，无需安装 Rust：
+从 [GitHub Releases](https://github.com/xinovate/codeX/releases) 下载，无需安装 Rust：
 
 | 平台 | 下载包 |
 |------|--------|
@@ -33,7 +33,7 @@
 需要先安装 [Rust](https://rustup.rs/)，然后：
 
 ```bash
-git clone https://github.com/xinovate/codex.git
+git clone https://github.com/xinovate/codeX.git
 cd codex/codex-rs
 cargo build --release --bin codex
 ```
@@ -311,7 +311,7 @@ Codex CLI with support for Chinese LLM providers (Volcengine/Doubao, Kimi, Xiaom
 
 **Option A: Pre-built binary (recommended)**
 
-Download from [GitHub Releases](https://github.com/xinovate/codex/releases):
+Download from [GitHub Releases](https://github.com/xinovate/codeX/releases):
 
 | Platform | Package |
 |----------|---------|
@@ -326,7 +326,7 @@ Download from [GitHub Releases](https://github.com/xinovate/codex/releases):
 Requires [Rust](https://rustup.rs/):
 
 ```bash
-git clone https://github.com/xinovate/codex.git
+git clone https://github.com/xinovate/codeX.git
 cd codex/codex-rs
 cargo build --release --bin codex
 ```
