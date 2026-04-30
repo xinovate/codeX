@@ -243,6 +243,27 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 - 推理内容（thinking / reasoning）
 - CLI 自动将内部 Responses API 转换为 Chat Completions API 格式
 
+### Q: 各 Provider 思考模式支持情况？
+
+所有 Provider 的基础对话（非思考模式）均支持。思考模式支持情况：
+
+| Provider | 思考模型示例 | 思考模式 | 说明 |
+|----------|-------------|---------|------|
+| DeepSeek | deepseek-r1, deepseek-v3 | 支持 | 必须回传 `reasoning_content`（已自动处理） |
+| 火山引擎/豆包 | doubao-1.5-thinking-pro | 支持 | 同 DeepSeek 格式 |
+| Kimi/月之暗面 | kimi-k2 | 支持 | 同 DeepSeek 格式 |
+| GLM/智谱 | glm-z1, glm-z1-air | 支持 | 同 DeepSeek 格式 |
+| XiaomiMimo | MiMo-7B | 取决于部署方式 | 开源模型，API 格式取决于服务框架 |
+
+所有支持思考模式的 Provider 统一使用 `reasoning_content` 字段。CLI 会自动处理该字段的接收和回传，无需额外配置。
+
+使用思考模型时，直接在 `config.toml` 中指定模型名称即可：
+
+```toml
+model = "deepseek-r1"
+model_provider = "deepseek"
+```
+
 ### Q: API Key 会存入配置文件吗？
 
 不会。API Key 通过环境变量配置，config.toml 中只写环境变量名（`env_key`），不写实际的 Key。
