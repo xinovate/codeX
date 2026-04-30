@@ -238,6 +238,7 @@ codex exec "Write a Hello World in Python"
 ## Configuration
 
 Config file location:
+
 - Linux / macOS: `~/.codex/config.toml`
 - Windows: `%USERPROFILE%\.codex\config.toml`
 
