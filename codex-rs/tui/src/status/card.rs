@@ -261,7 +261,10 @@ impl StatusHistoryCell {
                 ),
             ),
         ];
-        if matches!(config.model_provider.wire_api, WireApi::Responses | WireApi::Chat) {
+        if matches!(
+            config.model_provider.wire_api,
+            WireApi::Responses | WireApi::Chat
+        ) {
             let effort_value = reasoning_effort_override
                 .unwrap_or(config.model_reasoning_effort)
                 .map(|effort| effort.to_string())

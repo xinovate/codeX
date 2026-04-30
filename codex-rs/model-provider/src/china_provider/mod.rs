@@ -94,8 +94,8 @@ impl ModelProvider for ChinaModelProvider {
     ) -> SharedModelsManager {
         // China providers always use static models manager since
         // the /models endpoint may not be available.
-        let model_catalog = config_model_catalog
-            .unwrap_or_else(|| ModelsResponse { models: vec![] });
+        let model_catalog =
+            config_model_catalog.unwrap_or_else(|| ModelsResponse { models: vec![] });
         Arc::new(StaticModelsManager::new(
             None,
             model_catalog,

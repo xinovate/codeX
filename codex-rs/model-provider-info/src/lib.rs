@@ -398,16 +398,19 @@ impl ModelProviderInfo {
     /// known Chinese provider identifiers.
     pub fn is_china_provider(&self) -> bool {
         const CHINA_PROVIDERS: &[&str] = &[
-            "volcengine", "kimi", "doubao", "qwen", "glm",
-            "baichuan", "deepseek", "minimax", "moonshot",
+            "volcengine",
+            "kimi",
+            "doubao",
+            "qwen",
+            "glm",
+            "baichuan",
+            "deepseek",
+            "minimax",
+            "moonshot",
         ];
 
         let name_lower = self.name.to_lowercase();
-        let base_url_lower = self
-            .base_url
-            .as_deref()
-            .unwrap_or("")
-            .to_lowercase();
+        let base_url_lower = self.base_url.as_deref().unwrap_or("").to_lowercase();
 
         CHINA_PROVIDERS
             .iter()

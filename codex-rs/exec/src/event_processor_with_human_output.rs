@@ -442,7 +442,10 @@ fn config_summary_entries(
             ),
         ),
     ];
-    if matches!(config.model_provider.wire_api, WireApi::Responses | WireApi::Chat) {
+    if matches!(
+        config.model_provider.wire_api,
+        WireApi::Responses | WireApi::Chat
+    ) {
         entries.push((
             "reasoning effort",
             config

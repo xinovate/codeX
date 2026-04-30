@@ -23,7 +23,9 @@ use codex_protocol::protocol::TokenUsage;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::Method;
-use serde_json::{Map, Value, json};
+use serde_json::Map;
+use serde_json::Value;
+use serde_json::json;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use tracing::instrument;
@@ -98,15 +100,9 @@ impl<T: HttpTransport> ChatCompletionsClient<T> {
         // 3. Send to chat/completions endpoint
         let stream_response = self
             .session
-            .stream_with(
-                Method::POST,
-                Self::path(),
-                headers,
-                Some(body),
-                |req| {
-                    req.compression = request_compression;
-                },
-            )
+            .stream_with(Method::POST, Self::path(), headers, Some(body), |req| {
+                req.compression = request_compression;
+            })
             .await?;
 
         // 4. Parse SSE with Chat→Responses conversion
@@ -240,16 +236,13 @@ fn spawn_chat_completions_stream(
                             }
                             accumulated_text.push_str(content);
                             let _ = tx_event
-                                .send(Ok(ResponseEvent::OutputTextDelta(
-                                    content.to_string(),
-                                )))
+                                .send(Ok(ResponseEvent::OutputTextDelta(content.to_string())))
                                 .await;
                         }
                     }
 
                     // Reasoning content → reasoning_text.delta (Volcengine-specific)
-                    if let Some(reasoning) =
-                        delta.get("reasoning_content").and_then(|v| v.as_str())
+                    if let Some(reasoning) = delta.get("reasoning_content").and_then(|v| v.as_str())
                     {
                         if !reasoning.is_empty() {
                             // Ensure message item is added before reasoning delta
@@ -348,10 +341,7 @@ fn spawn_chat_completions_stream(
                 }
 
                 // Finish reason → output_item.done + response.completed
-                if let Some(finish_reason) = choices
-                    .get("finish_reason")
-                    .and_then(|v| v.as_str())
-                {
+                if let Some(finish_reason) = choices.get("finish_reason").and_then(|v| v.as_str()) {
                     let _status = match finish_reason {
                         "stop" => "completed",
                         "length" => "incomplete",
@@ -455,9 +445,11 @@ fn spawn_chat_completions_stream(
                                 codex_protocol::models::ResponseItem::Message {
                                     id: None,
                                     role: "assistant".to_string(),
-                                    content: vec![codex_protocol::models::ContentItem::OutputText {
-                                        text: accumulated_text.clone(),
-                                    }],
+                                    content: vec![
+                                        codex_protocol::models::ContentItem::OutputText {
+                                            text: accumulated_text.clone(),
+                                        },
+                                    ],
                                     phase: None,
                                 },
                             )))
@@ -571,20 +563,35 @@ fn convert_request_body(responses_body: &mut Value) {
                 let msg_type = obj.get("type").and_then(|v| v.as_str());
                 if msg_type == Some("function_call") {
                     // Convert to assistant message with tool_calls
-                    let call_id = obj.get("call_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let arguments = obj.get("arguments").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let call_id = obj
+                        .get("call_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let name = obj
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let arguments = obj
+                        .get("arguments")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
                     *obj = Map::new();
                     obj.insert("role".to_string(), Value::String("assistant".to_string()));
                     obj.insert("content".to_string(), Value::Null);
-                    obj.insert("tool_calls".to_string(), json!([{
-                        "id": call_id,
-                        "type": "function",
-                        "function": {
-                            "name": name,
-                            "arguments": arguments
-                        }
-                    }]));
+                    obj.insert(
+                        "tool_calls".to_string(),
+                        json!([{
+                            "id": call_id,
+                            "type": "function",
+                            "function": {
+                                "name": name,
+                                "arguments": arguments
+                            }
+                        }]),
+                    );
                     continue;
                 }
                 if msg_type == Some("function_call_output") {
@@ -594,7 +601,11 @@ fn convert_request_body(responses_body: &mut Value) {
                     // Note: Xiaomi Mimo doesn't support function calling, so this
                     // path is never hit for Mimo. The `continue` skips the
                     // role:"tool" → role:"user" fallback below.
-                    let call_id = obj.get("call_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let call_id = obj
+                        .get("call_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
                     // `output` can be a plain string or an array of content items
                     // (e.g. [{"type":"output_text","text":"..."}]).
                     let output = match obj.get("output") {
@@ -621,9 +632,7 @@ fn convert_request_body(responses_body: &mut Value) {
                         .and_then(|v| v.as_array())
                         .map(|arr| {
                             arr.iter()
-                                .filter_map(|item| {
-                                    item.get("text").and_then(|t| t.as_str())
-                                })
+                                .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
                                 .collect::<Vec<_>>()
                                 .join("")
                         })
@@ -743,17 +752,13 @@ fn convert_request_body(responses_body: &mut Value) {
                         if let (Some(last_obj), Some(cur_obj)) =
                             (last.as_object_mut(), msg.as_object())
                         {
-                            if let (Some(Value::Array(last_tc)), Some(Value::Array(cur_tc))) = (
-                                last_obj.get_mut("tool_calls"),
-                                cur_obj.get("tool_calls"),
-                            ) {
+                            if let (Some(Value::Array(last_tc)), Some(Value::Array(cur_tc))) =
+                                (last_obj.get_mut("tool_calls"), cur_obj.get("tool_calls"))
+                            {
                                 last_tc.extend(cur_tc.iter().cloned());
                             }
                             // Keep the last assistant's content if non-null, otherwise use current
-                            if last_obj
-                                .get("content")
-                                .map_or(true, |c| c.is_null())
-                            {
+                            if last_obj.get("content").map_or(true, |c| c.is_null()) {
                                 if let Some(cur_content) = cur_obj.get("content") {
                                     last_obj.insert("content".to_string(), cur_content.clone());
                                 }
@@ -771,10 +776,13 @@ fn convert_request_body(responses_body: &mut Value) {
         if let Some(instructions) = obj.remove("instructions") {
             if let Some(text) = instructions.as_str() {
                 if !text.is_empty() {
-                    messages.insert(0, json!({
-                        "role": "system",
-                        "content": text
-                    }));
+                    messages.insert(
+                        0,
+                        json!({
+                            "role": "system",
+                            "content": text
+                        }),
+                    );
                 }
             }
         }
@@ -807,10 +815,7 @@ fn convert_request_body(responses_body: &mut Value) {
     //    DeepSeek's deepseek-v4-flash has thinking enabled by default, which
     //    returns reasoning_content that must be round-tripped. Since Codex
     //    doesn't support this for Chat Completions providers, disable it.
-    chat_obj.insert(
-        "thinking".to_string(),
-        json!({"type": "disabled"}),
-    );
+    chat_obj.insert("thinking".to_string(), json!({"type": "disabled"}));
 
     // 7. Convert tools from Responses API format to Chat Completions format
     //    Responses:  {"type":"function", "name":"x", "description":"...", "parameters":{...}}
@@ -832,7 +837,10 @@ fn convert_request_body(responses_body: &mut Value) {
                             let mut chat_tool = json!({"type": "function", "function": func});
                             if let Some(obj) = chat_tool.as_object_mut() {
                                 for (k, v) in t {
-                                    if !matches!(k.as_str(), "type" | "name" | "description" | "parameters" | "strict") {
+                                    if !matches!(
+                                        k.as_str(),
+                                        "type" | "name" | "description" | "parameters" | "strict"
+                                    ) {
                                         obj.insert(k.clone(), v.clone());
                                     }
                                 }
@@ -860,7 +868,10 @@ fn convert_request_body(responses_body: &mut Value) {
     *responses_body = Value::Object(chat_obj);
 
     // Debug: log the converted request body for troubleshooting
-    tracing::debug!("Chat Completions request body: {}", serde_json::to_string(responses_body).unwrap_or_default());
+    tracing::debug!(
+        "Chat Completions request body: {}",
+        serde_json::to_string(responses_body).unwrap_or_default()
+    );
 }
 
 #[cfg(test)]
@@ -870,7 +881,10 @@ mod tests {
     #[test]
     fn path_returns_chat_completions() {
         // path() does not depend on T, so we can use ReqwestTransport which implements HttpTransport
-        assert_eq!(ChatCompletionsClient::<codex_client::ReqwestTransport>::path(), "chat/completions");
+        assert_eq!(
+            ChatCompletionsClient::<codex_client::ReqwestTransport>::path(),
+            "chat/completions"
+        );
     }
 
     #[test]
@@ -886,7 +900,10 @@ mod tests {
 
         convert_request_body(&mut body);
 
-        assert_eq!(body["messages"], json!([{"role": "user", "content": "Hello"}]));
+        assert_eq!(
+            body["messages"],
+            json!([{"role": "user", "content": "Hello"}])
+        );
         assert_eq!(body["max_tokens"], 100);
         assert!(body.get("input").is_none());
         assert!(body.get("max_output_tokens").is_none());
@@ -905,7 +922,10 @@ mod tests {
         convert_request_body(&mut body);
 
         let messages = body["messages"].as_array().unwrap();
-        assert_eq!(messages[0], json!({"role": "system", "content": "You are helpful."}));
+        assert_eq!(
+            messages[0],
+            json!({"role": "system", "content": "You are helpful."})
+        );
         assert_eq!(messages[1], json!({"role": "user", "content": "Hi"}));
     }
 
@@ -1064,8 +1084,18 @@ mod tests {
         assert_eq!(messages[1]["role"], "assistant");
         // Tool role converted to user for Xiaomi Mimo compatibility
         assert_eq!(messages[2]["role"], "user");
-        assert!(messages[2]["content"].as_str().unwrap().contains("call_123"));
-        assert!(messages[2]["content"].as_str().unwrap().contains("file1.txt"));
+        assert!(
+            messages[2]["content"]
+                .as_str()
+                .unwrap()
+                .contains("call_123")
+        );
+        assert!(
+            messages[2]["content"]
+                .as_str()
+                .unwrap()
+                .contains("file1.txt")
+        );
     }
 
     #[test]

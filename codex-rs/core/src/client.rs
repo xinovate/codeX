@@ -33,6 +33,7 @@ use std::sync::atomic::Ordering;
 
 use codex_api::ApiError;
 use codex_api::AuthProvider;
+use codex_api::ChatCompletionsClient as ApiChatCompletionsClient;
 use codex_api::CompactClient as ApiCompactClient;
 use codex_api::CompactionInput as ApiCompactionInput;
 use codex_api::Compression;
@@ -49,7 +50,6 @@ use codex_api::ReqwestTransport;
 use codex_api::ResponseCreateWsRequest;
 use codex_api::ResponsesApiRequest;
 use codex_api::ResponsesClient as ApiResponsesClient;
-use codex_api::ChatCompletionsClient as ApiChatCompletionsClient;
 use codex_api::ResponsesOptions as ApiResponsesOptions;
 use codex_api::ResponsesWebsocketClient as ApiWebSocketResponsesClient;
 use codex_api::ResponsesWebsocketConnection as ApiWebSocketConnection;
@@ -1283,10 +1283,7 @@ impl ModelClientSession {
         turn_metadata_header: Option<&str>,
         inference_trace: &InferenceTraceContext,
     ) -> Result<ResponseStream> {
-        let client_setup = self
-            .client
-            .current_client_setup()
-            .await?;
+        let client_setup = self.client.current_client_setup().await?;
 
         let transport = ReqwestTransport::new(build_reqwest_client());
         let (request_telemetry, sse_telemetry) =
@@ -1324,16 +1321,18 @@ impl ModelClientSession {
         let extra_headers = self.build_extra_headers(turn_metadata_header, compression);
 
         let stream_result = client
-            .stream_request(request, extra_headers, compression, /*turn_state*/ None)
+            .stream_request(
+                request,
+                extra_headers,
+                compression,
+                /*turn_state*/ None,
+            )
             .await;
 
         match stream_result {
             Ok(stream) => {
-                let (stream, _) = map_response_stream(
-                    stream,
-                    session_telemetry.clone(),
-                    inference_trace_attempt,
-                );
+                let (stream, _) =
+                    map_response_stream(stream, session_telemetry.clone(), inference_trace_attempt);
                 Ok(stream)
             }
             Err(ApiError::Transport(
