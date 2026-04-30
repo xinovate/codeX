@@ -701,9 +701,7 @@ fn run_update_command() -> anyhow::Result<()> {
     });
 
     match result {
-        Ok(()) => {
-            println!("\nUpdate complete! Please restart Codex.");
-            Ok(())
+        Ok(()) => Ok(()),
         }
         Err(e) => {
             anyhow::bail!("Update failed: {e}\nPlease download manually from https://github.com/xinovate/codex/releases");
