@@ -100,10 +100,10 @@ Codex CLI supports Chinese model providers via the OpenAI Chat Completions API. 
 
 | Provider | Base URL | Model Example | Status |
 |----------|----------|---------------|--------|
-| DeepSeek | `https://api.deepseek.com` | `deepseek-v4-flash`, `deepseek-v4-pro` | ✅ Fully tested |
-| 火山引擎 (Volcengine) | `https://ark.cn-beijing.volces.com/api/coding/v3` | `doubao-seed-2.0-code` | ✅ Fully tested |
-| Kimi Code | `https://api.kimi.com/coding/v1` | `kimi-k2.6` | ✅ Fully tested |
-| Xiaomi Mimo | `https://api.xiaomimimo.com/v1` | `mimo-v2.5-pro` | ✅ Fully tested |
+| DeepSeek | `https://api.deepseek.com` | `deepseek-v4-flash`, `deepseek-v4-pro` | Fully tested |
+| Volcengine | `https://ark.cn-beijing.volces.com/api/coding/v3` | `doubao-seed-2.0-code` | Fully tested |
+| Kimi Code | `https://api.kimi.com/coding/v1` | `kimi-k2.6` | Fully tested |
+| Xiaomi Mimo | `https://api.xiaomimimo.com/v1` | `mimo-v2.5-pro` | Fully tested |
 
 See [`CHINA_PROVIDER.md`](CHINA_PROVIDER.md) for detailed setup instructions (in Chinese and English).
 
