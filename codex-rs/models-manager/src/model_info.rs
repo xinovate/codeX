@@ -62,9 +62,34 @@ pub fn with_config_overrides(mut model: ModelInfo, config: &ModelsManagerConfig)
     model
 }
 
+/// Known China provider model prefixes. Models matching these patterns are
+/// treated as known (not fallback) since China providers don't expose a
+/// `/models` endpoint and users specify model names directly in config.
+const CHINA_PROVIDER_MODEL_PREFIXES: &[&str] = &[
+    "deepseek-",
+    "doubao-",
+    "kimi-",
+    "moonshot-",
+    "glm-",
+    "qwen-",
+    "baichuan-",
+    "minimax-",
+    "mimo",
+];
+
+fn is_china_provider_model(slug: &str) -> bool {
+    let lower = slug.to_lowercase();
+    CHINA_PROVIDER_MODEL_PREFIXES
+        .iter()
+        .any(|prefix| lower.starts_with(prefix))
+}
+
 /// Build a minimal fallback model descriptor for missing/unknown slugs.
 pub fn model_info_from_slug(slug: &str) -> ModelInfo {
-    warn!("Unknown model {slug} is used. This will use fallback model metadata.");
+    let is_china = is_china_provider_model(slug);
+    if !is_china {
+        warn!("Unknown model {slug} is used. This will use fallback model metadata.");
+    }
     ModelInfo {
         slug: slug.to_string(),
         display_name: slug.to_string(),
@@ -95,7 +120,7 @@ pub fn model_info_from_slug(slug: &str) -> ModelInfo {
         effective_context_window_percent: 95,
         experimental_supported_tools: Vec::new(),
         input_modalities: default_input_modalities(),
-        used_fallback_model_metadata: true, // this is the fallback model metadata
+        used_fallback_model_metadata: !is_china,
         supports_search_tool: false,
     }
 }
