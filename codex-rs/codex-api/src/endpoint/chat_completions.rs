@@ -180,9 +180,7 @@ fn spawn_chat_completions_stream(
                 }
                 Err(_) => {
                     let _ = tx_event
-                        .send(Err(ApiError::Stream(
-                            "idle timeout waiting for SSE".into(),
-                        )))
+                        .send(Err(ApiError::Stream("idle timeout waiting for SSE".into())))
                         .await;
                     return;
                 }
