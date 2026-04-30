@@ -4,31 +4,31 @@ A fork of OpenAI's Codex CLI with built-in support for Chinese model providers (
 
 ## 安装 / Install
 
-### 方式一：下载预编译二进制（推荐）
+### Linux 用户
 
-从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载对应平台的二进制文件：
-
-| 平台 | 文件 |
-|------|------|
-| Linux (x86_64) | `codex-linux-x64.tar.gz` |
-| Linux (ARM64) | `codex-linux-arm64.tar.gz` |
-| Windows (x86_64) | `codex-windows-x64.zip` |
+从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载预编译二进制，无需安装 Rust：
 
 ```shell
-# Linux
-tar xzf codex-linux-x64.tar.gz
+# x86_64
+curl -L https://github.com/xinovate/codex/releases/download/v0.1.0/codex-linux-x64.tar.gz | tar xz
 sudo mv codex /usr/local/bin/
 
-# Windows (PowerShell)
-Expand-Archive codex-windows-x64.zip -DestinationPath C:\codex
-# 将 C:\codex 添加到 PATH
+# ARM64
+curl -L https://github.com/xinovate/codex/releases/download/v0.1.0/codex-linux-arm64.tar.gz | tar xz
+sudo mv codex /usr/local/bin/
 ```
 
-> macOS 用户请使用方式二从源码构建。
+### Windows 用户
 
-### 方式二：从源码构建
+从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载预编译二进制，无需安装 Rust：
 
-需要先安装 [Rust](https://rustup.rs/)：
+1. 下载 `codex-windows-x64.zip`
+2. 解压到目录，如 `C:\codex`
+3. 将 `C:\codex` 添加到系统 PATH
+
+### macOS 用户
+
+macOS 没有预编译二进制，需要从源码构建。先安装 [Rust](https://rustup.rs/)：
 
 ```shell
 # 安装 Rust
