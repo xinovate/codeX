@@ -1,44 +1,44 @@
 # Codex CLI - China Provider Fork
 
-A fork of OpenAI's Codex CLI (based on commit `7d72fc8f5`, 2026-04-28) with built-in support for Chinese model providers (Volcengine, Kimi, Doubao, XiaomiMimo, etc.) that use the OpenAI Chat Completions API.
+基于 OpenAI Codex CLI 的 fork（基于 commit `7d72fc8f5`，2026-04-28），内置支持国内大模型服务商（火山引擎/豆包、Kimi Code、小米 Mimo、DeepSeek 等），通过 OpenAI Chat Completions API 接入。
 
-## Install
+## 安装
 
 ### Linux
 
-Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases). No Rust installation required.
+从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载预编译二进制，无需安装 Rust。
 
-#### 1. Download and Extract
+#### 1. 下载解压
 
-Choose the package matching your CPU architecture:
+根据 CPU 架构选择对应包：
 
 ```shell
-# x86_64 (most Intel/AMD computers)
+# x86_64（大多数 Intel/AMD 电脑）
 curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-x64.tar.gz | tar xz
 
-# ARM64 (Raspberry Pi, Apple Silicon VMs, etc.)
+# ARM64（树莓派、Apple Silicon 虚拟机等）
 curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-arm64.tar.gz | tar xz
 ```
 
-Not sure about your architecture? Run `uname -m` -- `x86_64` means x64, `aarch64` means arm64.
+不确定架构？运行 `uname -m`，`x86_64` 是 x64，`aarch64` 是 arm64。
 
-#### 2. Install
+#### 2. 安装
 
-Move the binary to a directory in your PATH:
+将二进制文件移到 PATH 目录：
 
 ```shell
 sudo mv codex /usr/local/bin/
 ```
 
-Verify installation:
+验证安装：
 
 ```shell
 codex --version
 ```
 
-#### 3. Configure
+#### 3. 配置
 
-Create the config file `~/.codex/config.toml`:
+创建配置文件 `~/.codex/config.toml`：
 
 ```shell
 mkdir -p ~/.codex
@@ -53,63 +53,63 @@ wire_api = "chat"
 EOF
 ```
 
-#### 4. Set API Key
+#### 4. 设置 API Key
 
 ```shell
-# Current session only
-export MIMO_API_KEY="your-api-key-here"
+# 当前会话
+export MIMO_API_KEY="你的API Key"
 ```
 
-For permanent setup, add to your shell config:
+永久生效，添加到 shell 配置：
 
 ```shell
-# bash users
-echo 'export MIMO_API_KEY="your-api-key-here"' >> ~/.bashrc
+# bash 用户
+echo 'export MIMO_API_KEY="你的API Key"' >> ~/.bashrc
 
-# zsh users
-echo 'export MIMO_API_KEY="your-api-key-here"' >> ~/.zshrc
+# zsh 用户
+echo 'export MIMO_API_KEY="你的API Key"' >> ~/.zshrc
 ```
 
-Then reopen your terminal or run `source ~/.bashrc` (or `source ~/.zshrc`).
+然后重新打开终端，或执行 `source ~/.bashrc`（或 `source ~/.zshrc`）。
 
-#### 5. Run
+#### 5. 使用
 
 ```shell
-# Interactive mode
+# 交互模式
 codex
 
-# Single task
-codex exec "Write a Hello World in Python"
+# 单次任务
+codex exec "用Python写一个Hello World"
 ```
 
 ### Windows
 
-Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases). No Rust installation required.
+从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载预编译二进制，无需安装 Rust。
 
-#### 1. Download and Extract
+#### 1. 下载解压
 
-Download `codex-windows-x64.zip`, extract to a directory like `C:\codex`, which gives you `codex.exe`.
+下载 `codex-windows-x64.zip`，解压到目录如 `C:\codex`，得到 `codex.exe`。
 
-#### 2. Add to PATH
+#### 2. 添加到 PATH
 
-Add the directory containing `codex.exe` to your system PATH:
+将 `codex.exe` 所在目录添加到系统 PATH：
 
-1. Press `Win + S`, search for **"Environment Variables"**, click **"Edit the system environment variables"**
-2. Click the **"Environment Variables"** button
-3. Under **"User variables"**, select `Path`, click **"Edit"**
-4. Click **"New"**, enter `C:\codex`
-5. Click **"OK"** to save all dialogs
-6. **Reopen** PowerShell or CMD for PATH changes to take effect
+1. 按 `Win + S`，搜索 **"环境变量"**，点击 **"编辑系统环境变量"**
+2. 点击 **"环境变量"** 按钮
+3. 在 **"用户变量"** 中，选择 `Path`，点击 **"编辑"**
+4. 点击 **"新建"**，输入 `C:\codex`
+5. 点击 **"确定"** 保存所有对话框
+6. **重新打开** PowerShell 或 CMD 使 PATH 生效
 
-Verify installation:
+验证安装：
 
 ```powershell
 codex --version
 ```
 
-#### 3. Configure
+#### 3. 配置
 
-Create the config file `%USERPROFILE%\.codex\config.toml` (i.e., `C:\Users\<username>\.codex\config.toml`):
+创建配置文件 `%USERPROFILE%\.codex\config.toml`（即 `C:\Users\<用户名>\.codex\config.toml`）：
 
 ```toml
 model_provider = "mimo"
@@ -121,46 +121,46 @@ env_key = "MIMO_API_KEY"
 wire_api = "chat"
 ```
 
-Or use PowerShell to create it quickly:
+或用 PowerShell 快速创建：
 
 ```powershell
 mkdir "$env:USERPROFILE\.codex" -Force
 notepad "$env:USERPROFILE\.codex\config.toml"
 ```
 
-#### 4. Set API Key
+#### 4. 设置 API Key
 
-Set the environment variable in PowerShell (current session only):
+PowerShell 中设置环境变量（当前会话）：
 
 ```powershell
-$env:MIMO_API_KEY = "your-api-key-here"
+$env:MIMO_API_KEY = "你的API Key"
 ```
 
-For permanent setup (survives reboots), use System Settings:
+永久生效（重启后保留），使用系统设置：
 
-1. Press `Win + S`, search for **"Environment Variables"**, click **"Edit the system environment variables"**
-2. Click the **"Environment Variables"** button
-3. Under **"User variables"**, click **"New"**
-4. Variable name: `MIMO_API_KEY`, Variable value: your API key
-5. Click **"OK"** to save
+1. 按 `Win + S`，搜索 **"环境变量"**，点击 **"编辑系统环境变量"**
+2. 点击 **"环境变量"** 按钮
+3. 在 **"用户变量"** 中，点击 **"新建"**
+4. 变量名：`MIMO_API_KEY`，变量值：你的 API Key
+5. 点击 **"确定"** 保存
 
-#### 5. Run
+#### 5. 使用
 
 ```powershell
-# Interactive mode
+# 交互模式
 codex
 
-# Single task
-codex exec "Write a Hello World in Python"
+# 单次任务
+codex exec "用Python写一个Hello World"
 ```
 
 ### macOS
 
-Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases). No Rust installation required.
+从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载预编译二进制，无需安装 Rust。
 
-#### 1. Download and Extract
+#### 1. 下载解压
 
-Choose the package matching your CPU architecture:
+根据 CPU 架构选择对应包：
 
 ```shell
 # Apple Silicon (M1/M2/M3/M4)
@@ -170,23 +170,23 @@ curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-a
 curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-x64.tar.gz | tar xz
 ```
 
-Not sure? Run `uname -m`. If it says `arm64`, use arm64; if `x86_64`, use x64.
+不确定？运行 `uname -m`，`arm64` 用 arm64，`x86_64` 用 x64。
 
-#### 2. Install
+#### 2. 安装
 
 ```shell
 sudo mv codex /usr/local/bin/
 ```
 
-Verify installation:
+验证安装：
 
 ```shell
 codex --version
 ```
 
-#### 3. Configure
+#### 3. 配置
 
-Create the config file `~/.codex/config.toml`:
+创建配置文件 `~/.codex/config.toml`：
 
 ```shell
 mkdir -p ~/.codex
@@ -201,38 +201,38 @@ wire_api = "chat"
 EOF
 ```
 
-#### 4. Set API Key
+#### 4. 设置 API Key
 
 ```shell
-# Current session only
-export MIMO_API_KEY="your-api-key-here"
+# 当前会话
+export MIMO_API_KEY="你的API Key"
 ```
 
-For permanent setup, add to your shell config (macOS uses zsh by default):
+永久生效，添加到 shell 配置（macOS 默认 zsh）：
 
 ```shell
-echo 'export MIMO_API_KEY="your-api-key-here"' >> ~/.zshrc
+echo 'export MIMO_API_KEY="你的API Key"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-#### 5. Run
+#### 5. 使用
 
 ```shell
-# Interactive mode
+# 交互模式
 codex
 
-# Single task
-codex exec "Write a Hello World in Python"
+# 单次任务
+codex exec "用Python写一个Hello World"
 ```
 
-## Configuration
+## 配置说明
 
-Config file location:
+配置文件位置：
 
-- Linux / macOS: `~/.codex/config.toml`
-- Windows: `%USERPROFILE%\.codex\config.toml`
+- Linux / macOS：`~/.codex/config.toml`
+- Windows：`%USERPROFILE%\.codex\config.toml`
 
-Full configuration example:
+完整配置示例：
 
 ```toml
 model_provider = "mimo"
@@ -244,25 +244,25 @@ env_key = "MIMO_API_KEY"
 wire_api = "chat"
 ```
 
-To customize model metadata, create `~/.codex/custom_models.json` (Windows: `%USERPROFILE%\.codex\custom_models.json`) and reference it in your config:
+自定义模型元数据：创建 `~/.codex/custom_models.json`（Windows: `%USERPROFILE%\.codex\custom_models.json`），在配置中引用：
 
 ```toml
-model_catalog_json = "/home/username/.codex/custom_models.json"
-# Windows: model_catalog_json = "C:\\Users\\username\\.codex\\custom_models.json"
+model_catalog_json = "/home/用户名/.codex/custom_models.json"
+# Windows: model_catalog_json = "C:\\Users\\用户名\\.codex\\custom_models.json"
 ```
 
-For detailed configuration, see [`codex-rs/CHINA_PROVIDER.md`](codex-rs/CHINA_PROVIDER.md).
+详细配置见 [`codex-rs/CHINA_PROVIDER.md`](codex-rs/CHINA_PROVIDER.md)。
 
-## China Provider Setup
+## 国内服务商配置
 
-- [**China Provider Guide**](codex-rs/CHINA_PROVIDER.md)
+- [**国内服务商配置指南**](codex-rs/CHINA_PROVIDER.md)
 
-Supported providers: Volcengine, Kimi, Doubao, XiaomiMimo, and other platforms compatible with the OpenAI Chat Completions API.
+支持的服务商：火山引擎/豆包、Kimi Code、DeepSeek、小米 Mimo，以及任何兼容 OpenAI Chat Completions API 的国内平台。
 
-## Docs
+## 文档
 
-- [**China Provider Guide**](codex-rs/CHINA_PROVIDER.md)
-- [**Contributing**](./docs/contributing.md)
-- [**Installing & building**](./docs/install.md)
+- [**国内服务商配置指南**](codex-rs/CHINA_PROVIDER.md)
+- [**贡献指南**](./docs/contributing.md)
+- [**安装与构建**](./docs/install.md)
 
-This repository is licensed under the [Apache-2.0 License](LICENSE).
+本项目基于 [Apache-2.0 License](LICENSE) 开源。
