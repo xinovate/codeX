@@ -60,7 +60,7 @@ The release workflow (`.github/workflows/release.yml`) builds binaries for:
 
 - `cargo-deny`, `Codespell`, `ci` (Prettier + ASCII check) - Run on all pushes
 - `rust-ci-full`, `sdk`, `Bazel` - Upstream CI, may fail on fork (missing runners/secrets), ignore these
-- `release` - Triggered by `v*.*.*` tags, builds release binaries
+- `release` - Triggered by `v*.*.*` tags from `custom_provider` branch only (has `if: github.event.base_ref == 'refs/heads/custom_provider'` guard), builds release binaries for Linux/Windows/macOS
 
 ## Upstream Remote
 
