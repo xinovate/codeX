@@ -10,16 +10,16 @@ A fork of OpenAI's Codex CLI with built-in support for Chinese model providers (
 
 | 平台 | 文件 |
 |------|------|
-| macOS (Apple Silicon) | `codex-aarch64-apple-darwin.tar.gz` |
-| macOS (Intel) | `codex-x86_64-apple-darwin.tar.gz` |
-| Linux (x86_64) | `codex-x86_64-unknown-linux-musl.tar.gz` |
-| Linux (ARM64) | `codex-aarch64-unknown-linux-musl.tar.gz` |
+| Linux (x86_64) | `codex-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux (ARM64) | `codex-aarch64-unknown-linux-gnu.tar.gz` |
 
 ```shell
-# 示例：macOS Apple Silicon
-tar xzf codex-aarch64-apple-darwin.tar.gz
+# 示例：Linux x86_64
+tar xzf codex-x86_64-unknown-linux-gnu.tar.gz
 sudo mv codex /usr/local/bin/
 ```
+
+> macOS 用户请使用方式二从源码构建。
 
 ### 方式二：从源码构建
 
