@@ -564,6 +564,9 @@ fn convert_request_body(responses_body: &mut Value) {
         //    Responses API uses "function_call" and "function_call_output" types
         //    that have no "role" field — convert them to standard message format.
         //    Also handle role conversions and content type conversions.
+        //    Reasoning items are collected and attached to the next assistant message
+        //    as `reasoning_content` (required by DeepSeek and similar providers).
+        let mut pending_reasoning_content: Option<String> = None;
         for msg in &mut messages {
             if let Some(obj) = msg.as_object_mut() {
                 // Handle Responses API function_call items (no role field)
@@ -595,6 +598,31 @@ fn convert_request_body(responses_body: &mut Value) {
                     obj.insert("role".to_string(), Value::String("user".to_string()));
                     obj.insert("content".to_string(),
                         Value::String(format!("[Tool result for {call_id}]\n{output}")));
+                    continue;
+                }
+                if msg_type == Some("reasoning") {
+                    // Extract reasoning content to pass back in the next assistant
+                    // message. DeepSeek and similar providers require reasoning_content
+                    // to be included in subsequent requests.
+                    let reasoning_text: String = obj
+                        .get("content")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|item| {
+                                    item.get("text").and_then(|t| t.as_str())
+                                })
+                                .collect::<Vec<_>>()
+                                .join("")
+                        })
+                        .unwrap_or_default();
+                    if !reasoning_text.is_empty() {
+                        let existing = pending_reasoning_content.get_or_insert_with(String::new);
+                        existing.push_str(&reasoning_text);
+                    }
+                    // Mark for removal — will be filtered out after the loop
+                    *obj = Map::new();
+                    obj.insert("__remove__".to_string(), Value::Bool(true));
                     continue;
                 }
 
@@ -630,6 +658,14 @@ fn convert_request_body(responses_body: &mut Value) {
                 }
                 let is_assistant = obj.get("role").and_then(|r| r.as_str()) == Some("assistant");
 
+                // Attach accumulated reasoning content to this assistant message.
+                // DeepSeek requires reasoning_content to be passed back in subsequent requests.
+                if is_assistant {
+                    if let Some(reasoning) = pending_reasoning_content.take() {
+                        obj.insert("reasoning_content".to_string(), Value::String(reasoning));
+                    }
+                }
+
                 // Convert content item types within arrays
                 if let Some(content) = obj.get_mut("content") {
                     convert_content_types(content);
@@ -657,6 +693,13 @@ fn convert_request_body(responses_body: &mut Value) {
                 }
             }
         }
+
+        // Remove items marked for removal (e.g. Reasoning items already extracted)
+        messages.retain(|msg| {
+            !msg.as_object()
+                .map(|o| o.get("__remove__").is_some())
+                .unwrap_or(false)
+        });
 
         // 3. Prepend instructions as system message
         if let Some(instructions) = obj.remove("instructions") {
@@ -946,5 +989,52 @@ mod tests {
         // Content should include tool_call_id prefix
         assert!(messages[2]["content"].as_str().unwrap().contains("call_123"));
         assert!(messages[2]["content"].as_str().unwrap().contains("file1.txt"));
+    }
+
+    #[test]
+    fn attaches_reasoning_content_to_next_assistant_message() {
+        let mut body = json!({
+            "model": "test",
+            "input": [
+                {"role": "user", "content": "Think about this"},
+                {"type": "reasoning", "id": "rs-1", "summary": [],
+                 "content": [{"type": "reasoning_text", "text": "Let me think..."}]},
+                {"role": "assistant", "content": [
+                    {"type": "output_text", "text": "Here is my answer."}
+                ]},
+                {"role": "user", "content": "Follow up"}
+            ],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        // Reasoning item should be removed
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[0]["role"], "user");
+        // Assistant message should have reasoning_content attached
+        assert_eq!(messages[1]["role"], "assistant");
+        assert_eq!(messages[1]["content"], "Here is my answer.");
+        assert_eq!(messages[1]["reasoning_content"], "Let me think...");
+        assert_eq!(messages[2]["role"], "user");
+    }
+
+    #[test]
+    fn reasoning_content_without_following_assistant_is_ignored() {
+        let mut body = json!({
+            "model": "test",
+            "input": [
+                {"type": "reasoning", "id": "rs-1", "summary": [],
+                 "content": [{"type": "reasoning_text", "text": "Orphan reasoning"}]},
+                {"role": "user", "content": "Hello"}
+            ],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        // Reasoning item removed, only user message remains
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0]["role"], "user");
     }
 }
