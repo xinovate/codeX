@@ -40,12 +40,12 @@ impl UpdateAction {
             UpdateAction::BunGlobalLatest => ("bun", &["install", "-g", "@openai/codex"]),
             UpdateAction::BrewUpgrade => ("brew", &["upgrade", "--cask", "codex"]),
             UpdateAction::StandaloneUnix => (
-                "sh",
-                &["-c", "curl -fsSL https://chatgpt.com/codex/install.sh | sh"],
+                "echo",
+                &["Please download the latest release from https://github.com/xinovate/codex/releases"],
             ),
             UpdateAction::StandaloneWindows => (
-                "powershell",
-                &["-c", "irm https://chatgpt.com/codex/install.ps1|iex"],
+                "echo",
+                &["Please download the latest release from https://github.com/xinovate/codex/releases"],
             ),
         }
     }
@@ -112,15 +112,15 @@ mod tests {
         assert_eq!(
             UpdateAction::StandaloneUnix.command_args(),
             (
-                "sh",
-                &["-c", "curl -fsSL https://chatgpt.com/codex/install.sh | sh"][..],
+                "echo",
+                &["Please download the latest release from https://github.com/xinovate/codex/releases"][..],
             )
         );
         assert_eq!(
             UpdateAction::StandaloneWindows.command_args(),
             (
-                "powershell",
-                &["-c", "irm https://chatgpt.com/codex/install.ps1|iex"][..],
+                "echo",
+                &["Please download the latest release from https://github.com/xinovate/codex/releases"][..],
             )
         );
     }
