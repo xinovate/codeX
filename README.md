@@ -6,16 +6,80 @@ A fork of OpenAI's Codex CLI (based on commit `7d72fc8f5`, 2026-04-28) with buil
 
 ### Linux 用户
 
-从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载预编译二进制，无需安装 Rust：
+从 [GitHub Releases](https://github.com/xinovate/codex/releases) 下载预编译二进制，无需安装 Rust。
+
+#### 1. 下载并解压
+
+根据你的 CPU 架构选择对应的包：
 
 ```shell
-# x86_64
+# x86_64（大多数 Intel/AMD 电脑）
 curl -L https://github.com/xinovate/codex/releases/download/v0.1.0/codex-linux-x64.tar.gz | tar xz
-sudo mv codex /usr/local/bin/
 
-# ARM64
+# ARM64（如树莓派、Apple Silicon 虚拟机等）
 curl -L https://github.com/xinovate/codex/releases/download/v0.1.0/codex-linux-arm64.tar.gz | tar xz
+```
+
+不确定架构？运行 `uname -m`，输出 `x86_64` 选 x64，输出 `aarch64` 选 arm64。
+
+#### 2. 安装
+
+将二进制移到 PATH 目录，使其在任意位置可用：
+
+```shell
 sudo mv codex /usr/local/bin/
+```
+
+验证安装：
+
+```shell
+codex --version
+```
+
+#### 3. 配置
+
+创建配置文件 `~/.codex/config.toml`：
+
+```shell
+mkdir -p ~/.codex
+cat > ~/.codex/config.toml << 'EOF'
+model_provider = "mimo"
+
+[model_providers.mimo]
+name = "XiaomiMimo"
+base_url = "https://api.xiaomimimo.com/v1"
+env_key = "MIMO_API_KEY"
+wire_api = "chat"
+EOF
+```
+
+#### 4. 设置 API Key
+
+```shell
+# 当前会话生效
+export MIMO_API_KEY="你的API Key"
+```
+
+如需**永久生效**，写入 shell 配置文件：
+
+```shell
+# bash 用户
+echo 'export MIMO_API_KEY="你的API Key"' >> ~/.bashrc
+
+# zsh 用户
+echo 'export MIMO_API_KEY="你的API Key"' >> ~/.zshrc
+```
+
+然后重新打开终端，或执行 `source ~/.bashrc`（或 `source ~/.zshrc`）。
+
+#### 5. 运行
+
+```shell
+# 交互模式
+codex
+
+# 单次任务
+codex exec "用Python写一个Hello World"
 ```
 
 ### Windows 用户
@@ -92,25 +156,92 @@ codex exec "用Python写一个Hello World"
 
 ### macOS 用户
 
-macOS 没有预编译二进制，需要从源码构建。先安装 [Rust](https://rustup.rs/)：
+macOS 没有预编译二进制，需要从源码构建。
+
+#### 1. 安装 Rust
 
 ```shell
-# 安装 Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env
+```
 
-# 构建
+验证安装：
+
+```shell
+rustc --version
+cargo --version
+```
+
+#### 2. 构建
+
+```shell
 git clone https://github.com/xinovate/codex.git
 cd codex/codex-rs
 cargo build --release --bin codex
+```
 
-# 安装
+编译产物在 `target/release/codex`。
+
+#### 3. 安装
+
+```shell
 sudo cp target/release/codex /usr/local/bin/
+```
+
+验证安装：
+
+```shell
+codex --version
+```
+
+#### 4. 配置
+
+创建配置文件 `~/.codex/config.toml`：
+
+```shell
+mkdir -p ~/.codex
+cat > ~/.codex/config.toml << 'EOF'
+model_provider = "mimo"
+
+[model_providers.mimo]
+name = "XiaomiMimo"
+base_url = "https://api.xiaomimimo.com/v1"
+env_key = "MIMO_API_KEY"
+wire_api = "chat"
+EOF
+```
+
+#### 5. 设置 API Key
+
+```shell
+# 当前会话生效
+export MIMO_API_KEY="你的API Key"
+```
+
+如需**永久生效**，写入 shell 配置文件（macOS 默认 zsh）：
+
+```shell
+echo 'export MIMO_API_KEY="你的API Key"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+#### 6. 运行
+
+```shell
+# 交互模式
+codex
+
+# 单次任务
+codex exec "用Python写一个Hello World"
 ```
 
 ## 配置 / Configuration
 
-创建配置文件 `~/.codex/config.toml`：
+配置文件路径：
+- Linux / macOS：`~/.codex/config.toml`
+- Windows：`%USERPROFILE%\.codex\config.toml`
+
+完整配置示例：
 
 ```toml
 model_provider = "mimo"
@@ -122,23 +253,14 @@ env_key = "MIMO_API_KEY"
 wire_api = "chat"
 ```
 
-如需自定义模型元数据，可创建 `~/.codex/custom_models.json` 并在配置中引用：
+如需自定义模型元数据，可创建 `~/.codex/custom_models.json`（Windows: `%USERPROFILE%\.codex\custom_models.json`）并在配置中引用：
 
 ```toml
-# Linux/macOS
 model_catalog_json = "/home/用户名/.codex/custom_models.json"
-
-# Windows
-model_catalog_json = "C:\\Users\\用户名\\.codex\\custom_models.json"
+# Windows: model_catalog_json = "C:\\Users\\用户名\\.codex\\custom_models.json"
 ```
 
 详细配置说明见 [`codex-rs/CHINA_PROVIDER.md`](codex-rs/CHINA_PROVIDER.md)。
-
-## 运行 / Run
-
-```shell
-codex
-```
 
 ## 中国提供商设置 / China Provider Setup
 
