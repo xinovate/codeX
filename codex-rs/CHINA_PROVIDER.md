@@ -1,6 +1,15 @@
 # Codex CLI - China Provider
 
-支持国内大模型的 Codex CLI（火山引擎/豆包、Kimi、小米 Mimo 等），通过 Chat Completions API 接入。
+支持国内大模型的 Codex CLI（DeepSeek、火山引擎/豆包、Kimi Code、小米 Mimo 等），通过 Chat Completions API 接入。
+
+**已验证的服务商：**
+
+| 服务商 | 模型示例 | 状态 |
+|--------|---------|------|
+| DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` | ✅ 多轮/工具/分析 全部通过 |
+| 火山引擎 (Volcengine) | `doubao-seed-2.0-code` | ✅ 多轮/工具/分析 全部通过 |
+| Kimi Code | `kimi-k2.6` | ✅ 多轮/工具/分析 全部通过 |
+| Xiaomi Mimo | `mimo-v2.5-pro` | ✅ 多轮/工具/分析 全部通过 |
 
 ---
 
@@ -111,21 +120,6 @@ codex exec "用Python写一个Hello World"
 
 以下为各 Provider 的完整配置，直接复制到 `config.toml` 即可使用。
 
-### 小米 Mimo
-
-```toml
-model = "mimo-model-name"
-model_provider = "mimo"
-
-[model_providers.mimo]
-name = "XiaomiMimo"
-base_url = "https://api.xiaomimimo.com/v1"
-env_key = "MIMO_API_KEY"
-wire_api = "chat"
-```
-
-环境变量：`export MIMO_API_KEY="你的API Key"`
-
 ### DeepSeek
 
 ```toml
@@ -143,35 +137,56 @@ wire_api = "chat"
 
 可用模型：`deepseek-v4-flash`（非思考）、`deepseek-v4-pro`（思考）。旧名称 `deepseek-chat`、`deepseek-reasoner` 将于 2026/07/24 弃用。
 
+> **注意**：DeepSeek 的 `deepseek-v4-flash` 默认开启思考模式，Codex 会自动禁用（发送 `thinking: {type: "disabled"}`）。
+
 ### 火山引擎（豆包）
 
 ```toml
-model = "doubao-pro-32k"
+model = "doubao-seed-2.0-code"
 model_provider = "volcengine"
 
 [model_providers.volcengine]
 name = "Volcengine"
-base_url = "https://ark.cn-beijing.volces.com/api/coding/v1"
+base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
 env_key = "VOLCENGINE_API_KEY"
 wire_api = "chat"
 ```
 
 环境变量：`export VOLCENGINE_API_KEY="你的API Key"`
 
-### Kimi（月之暗面）
+> **注意**：火山引擎 Coding Plan 使用 `/api/coding/v3`（OpenAI 兼容），不要用 `/api/v3`（会产生额外费用）。
+
+### Kimi Code
 
 ```toml
-model = "moonshot-v1-32k"
+model = "kimi-k2.6"
 model_provider = "kimi"
 
 [model_providers.kimi]
-name = "Kimi"
-base_url = "https://api.moonshot.cn/v1"
-env_key = "KIMI_API_KEY"
+name = "KimiCode"
+base_url = "https://api.kimi.com/coding/v1"
+env_key = "KIMI_CODE_API_KEY"
 wire_api = "chat"
 ```
 
-环境变量：`export KIMI_API_KEY="你的API Key"`
+环境变量：`export KIMI_CODE_API_KEY="你的API Key"`
+
+> **注意**：Kimi Coding API 需要特定的 User-Agent 标识，Codex 会自动添加 `User-Agent: claude-code/0.1`。需要已订阅 Kimi 会员并开通 Kimi Code 权益。
+
+### 小米 Mimo
+
+```toml
+model = "mimo-v2.5-pro"
+model_provider = "mimo"
+
+[model_providers.mimo]
+name = "XiaomiMimo"
+base_url = "https://api.xiaomimimo.com/v1"
+env_key = "MIMO_API_KEY"
+wire_api = "chat"
+```
+
+环境变量：`export MIMO_API_KEY="你的API Key"`
 
 ### 添加其他 Provider
 
@@ -260,24 +275,17 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 
 ### Q: 各 Provider 思考模式支持情况？
 
-所有 Provider 的基础对话（非思考模式）均支持。思考模式支持情况：
+所有 Provider 的基础对话（非思考模式）均支持。Codex 默认禁用思考模式（发送 `thinking: {type: "disabled"}`），以避免 `reasoning_content` 回传问题。
 
 | Provider | 思考模型示例 | 思考模式 | 说明 |
 |----------|-------------|---------|------|
-| DeepSeek | deepseek-v4-pro, deepseek-reasoner | 支持 | 流式返回 `reasoning_content`，后续请求不回传（已自动处理） |
-| 火山引擎/豆包 | doubao-1.5-thinking-pro | 支持 | 同 DeepSeek 格式 |
-| Kimi/月之暗面 | kimi-k2 | 支持 | 同 DeepSeek 格式 |
-| GLM/智谱 | glm-z1, glm-z1-air | 支持 | 同 DeepSeek 格式 |
-| XiaomiMimo | MiMo-7B | 取决于部署方式 | 开源模型，API 格式取决于服务框架 |
+| DeepSeek | `deepseek-v4-pro` | 支持但默认禁用 | `deepseek-v4-flash` 默认开启思考，Codex 自动禁用 |
+| 火山引擎/豆包 | `doubao-1.5-thinking-pro` | 支持但默认禁用 | 同 DeepSeek 格式 |
+| Kimi Code | `kimi-k2` | 支持但默认禁用 | 同 DeepSeek 格式 |
+| GLM/智谱 | `glm-z1`, `glm-z1-air` | 支持但默认禁用 | 同 DeepSeek 格式 |
+| XiaomiMimo | `mimo-v2.5-pro` | 不支持 | Codex 未开启思考模式 |
 
-所有支持思考模式的 Provider 流式返回时使用 `reasoning_content` 字段传递思考内容。CLI 会自动处理该字段的接收，并在后续请求中正确剥离，无需额外配置。
-
-使用思考模型时，直接在 `config.toml` 中指定模型名称即可：
-
-```toml
-model = "deepseek-v4-pro"
-model_provider = "deepseek"
-```
+> **注意**：如果需要使用思考模式，需要修改代码中的 `thinking: {type: "disabled"}` 为 `"enabled"`，并确保正确处理 `reasoning_content` 的回传。
 
 ### Q: API Key 会存入配置文件吗？
 

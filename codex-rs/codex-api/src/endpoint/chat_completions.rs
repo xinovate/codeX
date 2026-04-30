@@ -564,8 +564,9 @@ fn convert_request_body(responses_body: &mut Value) {
         //    Responses API uses "function_call" and "function_call_output" types
         //    that have no "role" field — convert them to standard message format.
         //    Also handle role conversions and content type conversions.
-        //    Reasoning items are stripped entirely — DeepSeek docs explicitly state
-        //    that passing reasoning_content in messages causes 400 errors.
+        //    Reasoning items are collected and attached to the next assistant message
+        //    as `reasoning_content` (required by DeepSeek and similar providers).
+        let mut pending_reasoning_content: Option<String> = None;
         for msg in &mut messages {
             if let Some(obj) = msg.as_object_mut() {
                 // Handle Responses API function_call items (no role field)
@@ -589,20 +590,40 @@ fn convert_request_body(responses_body: &mut Value) {
                     continue;
                 }
                 if msg_type == Some("function_call_output") {
-                    // Convert to user message with tool output (since some providers
-                    // don't support "tool" role)
+                    // Responses API → Chat Completions: convert to role:"tool" with
+                    // tool_call_id so the provider can link it to the tool call.
+                    // DeepSeek, Volcengine, Kimi all require this format.
+                    // Note: Xiaomi Mimo doesn't support function calling, so this
+                    // path is never hit for Mimo. The `continue` skips the
+                    // role:"tool" → role:"user" fallback below.
                     let call_id = obj.get("call_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
                     let output = obj.get("output").and_then(|v| v.as_str()).unwrap_or("").to_string();
                     *obj = Map::new();
-                    obj.insert("role".to_string(), Value::String("user".to_string()));
-                    obj.insert("content".to_string(),
-                        Value::String(format!("[Tool result for {call_id}]\n{output}")));
+                    obj.insert("role".to_string(), Value::String("tool".to_string()));
+                    obj.insert("tool_call_id".to_string(), Value::String(call_id));
+                    obj.insert("content".to_string(), Value::String(output));
                     continue;
                 }
                 if msg_type == Some("reasoning") {
-                    // Strip reasoning items entirely. DeepSeek docs explicitly state:
-                    // "如果您在输入的 messages 序列中，传入了 reasoning_content，
-                    // API 会返回 400 错误。"
+                    // Extract reasoning content to pass back in the next assistant
+                    // message. DeepSeek API requires reasoning_content to be included
+                    // in subsequent requests (despite docs saying otherwise).
+                    let reasoning_text: String = obj
+                        .get("content")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|item| {
+                                    item.get("text").and_then(|t| t.as_str())
+                                })
+                                .collect::<Vec<_>>()
+                                .join("")
+                        })
+                        .unwrap_or_default();
+                    if !reasoning_text.is_empty() {
+                        let existing = pending_reasoning_content.get_or_insert_with(String::new);
+                        existing.push_str(&reasoning_text);
+                    }
                     *obj = Map::new();
                     obj.insert("__remove__".to_string(), Value::Bool(true));
                     continue;
@@ -612,11 +633,12 @@ fn convert_request_body(responses_body: &mut Value) {
                     if role.as_str() == Some("developer") {
                         *role = Value::String("system".to_string());
                     }
-                    // Some providers don't support "tool" role — convert to "user"
-                    // and prepend tool_call_id info to content
+                    // Fallback for providers that don't support "tool" role (e.g.
+                    // Xiaomi Mimo). In normal Responses API flow, tool results arrive
+                    // as "function_call_output" (handled above), so this only triggers
+                    // if the input already contains role:"tool" messages.
                     if role.as_str() == Some("tool") {
                         *role = Value::String("user".to_string());
-                        // Clone call_id to avoid borrow conflict
                         let call_id = obj
                             .get("tool_call_id")
                             .and_then(|v| v.as_str())
@@ -628,7 +650,6 @@ fn convert_request_body(responses_body: &mut Value) {
                             if let Some(s) = content.as_str() {
                                 *content = Value::String(format!("{prefix}{s}"));
                             } else if let Some(arr) = content.as_array() {
-                                // Extract text from content items
                                 let text: String = arr
                                     .iter()
                                     .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
@@ -639,6 +660,14 @@ fn convert_request_body(responses_body: &mut Value) {
                     }
                 }
                 let is_assistant = obj.get("role").and_then(|r| r.as_str()) == Some("assistant");
+
+                // Attach accumulated reasoning content to this assistant message.
+                // DeepSeek API requires reasoning_content to be passed back.
+                if is_assistant {
+                    if let Some(reasoning) = pending_reasoning_content.take() {
+                        obj.insert("reasoning_content".to_string(), Value::String(reasoning));
+                    }
+                }
 
                 // Convert content item types within arrays
                 if let Some(content) = obj.get_mut("content") {
@@ -711,7 +740,16 @@ fn convert_request_body(responses_body: &mut Value) {
     obj.remove("reasoning");
     obj.remove("parallel_tool_calls");
 
-    // 6. Convert tools from Responses API format to Chat Completions format
+    // 6. Disable thinking mode for DeepSeek and similar providers.
+    //    DeepSeek's deepseek-v4-flash has thinking enabled by default, which
+    //    returns reasoning_content that must be round-tripped. Since Codex
+    //    doesn't support this for Chat Completions providers, disable it.
+    chat_obj.insert(
+        "thinking".to_string(),
+        json!({"type": "disabled"}),
+    );
+
+    // 7. Convert tools from Responses API format to Chat Completions format
     //    Responses:  {"type":"function", "name":"x", "description":"...", "parameters":{...}}
     //    Chat:      {"type":"function", "function":{"name":"x", "description":"...", "parameters":{...}}}
     if let Some(tools) = obj.remove("tools") {
@@ -750,13 +788,16 @@ fn convert_request_body(responses_body: &mut Value) {
         }
     }
 
-    // 7. Pass through remaining fields (model, temperature, tool_choice, etc.)
+    // 8. Pass through remaining fields (model, temperature, tool_choice, etc.)
     let remaining = std::mem::take(obj);
     for (key, value) in remaining {
         chat_obj.insert(key, value);
     }
 
     *responses_body = Value::Object(chat_obj);
+
+    // Debug: log the converted request body for troubleshooting
+    tracing::debug!("Chat Completions request body: {}", serde_json::to_string(responses_body).unwrap_or_default());
 }
 
 #[cfg(test)]
@@ -958,15 +999,40 @@ mod tests {
         let messages = body["messages"].as_array().unwrap();
         assert_eq!(messages[0]["role"], "user");
         assert_eq!(messages[1]["role"], "assistant");
-        // Tool role should be converted to user
+        // Tool role converted to user for Xiaomi Mimo compatibility
         assert_eq!(messages[2]["role"], "user");
-        // Content should include tool_call_id prefix
         assert!(messages[2]["content"].as_str().unwrap().contains("call_123"));
         assert!(messages[2]["content"].as_str().unwrap().contains("file1.txt"));
     }
 
     #[test]
-    fn strips_reasoning_items_from_messages() {
+    fn converts_function_call_output_to_tool_role() {
+        let mut body = json!({
+            "model": "test",
+            "input": [
+                {"role": "user", "content": "list files"},
+                {"type": "function_call", "id": "fc_1", "call_id": "call_123", "name": "exec", "arguments": "{\"cmd\":\"ls\"}"},
+                {"type": "function_call_output", "call_id": "call_123", "output": "file1.txt\nfile2.txt"}
+            ],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[0]["role"], "user");
+        // function_call → assistant with tool_calls
+        assert_eq!(messages[1]["role"], "assistant");
+        assert!(messages[1]["tool_calls"].is_array());
+        assert_eq!(messages[1]["tool_calls"][0]["id"], "call_123");
+        // function_call_output → tool with tool_call_id
+        assert_eq!(messages[2]["role"], "tool");
+        assert_eq!(messages[2]["tool_call_id"], "call_123");
+        assert_eq!(messages[2]["content"], "file1.txt\nfile2.txt");
+    }
+
+    #[test]
+    fn attaches_reasoning_content_to_next_assistant_message() {
         let mut body = json!({
             "model": "test",
             "input": [
@@ -983,13 +1049,11 @@ mod tests {
         convert_request_body(&mut body);
 
         let messages = body["messages"].as_array().unwrap();
-        // Reasoning item should be stripped entirely (not passed back)
         assert_eq!(messages.len(), 3);
         assert_eq!(messages[0]["role"], "user");
-        // Assistant message should NOT have reasoning_content
         assert_eq!(messages[1]["role"], "assistant");
         assert_eq!(messages[1]["content"], "Here is my answer.");
-        assert!(messages[1].get("reasoning_content").is_none());
+        assert_eq!(messages[1]["reasoning_content"], "Let me think...");
         assert_eq!(messages[2]["role"], "user");
     }
 

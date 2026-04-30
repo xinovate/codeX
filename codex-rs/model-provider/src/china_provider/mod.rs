@@ -61,7 +61,17 @@ impl ModelProvider for ChinaModelProvider {
     async fn api_provider(&self) -> Result<Provider> {
         // Use the configured base_url directly.
         // The ChatCompletionsClient will append /chat/completions.
-        self.info.to_api_provider(None)
+        let mut provider = self.info.to_api_provider(None)?;
+        // Some China providers (e.g. Kimi) require a coding-agent User-Agent
+        // header to allow access to the /chat/completions endpoint.
+        // Set a default if not already configured by the user.
+        if !provider.headers.contains_key(http::header::USER_AGENT) {
+            provider.headers.insert(
+                http::header::USER_AGENT,
+                http::HeaderValue::from_static("claude-code/0.1"),
+            );
+        }
+        Ok(provider)
     }
 
     async fn api_auth(&self) -> Result<SharedAuthProvider> {
