@@ -4,7 +4,7 @@ We provide Codex CLI as a standalone executable to ensure a zero-dependency inst
 
 ## Installing Codex
 
-This is a fork with China provider support. Build from source:
+This is a fork with China provider support. Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases), or build from source:
 
 ```shell
 git clone https://github.com/xinovate/codex.git

@@ -14,10 +14,10 @@ Choose the package matching your CPU architecture:
 
 ```shell
 # x86_64 (most Intel/AMD computers)
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.0/codex-linux-x64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-x64.tar.gz | tar xz
 
 # ARM64 (Raspberry Pi, Apple Silicon VMs, etc.)
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.0/codex-linux-arm64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-arm64.tar.gz | tar xz
 ```
 
 Not sure about your architecture? Run `uname -m` -- `x86_64` means x64, `aarch64` means arm64.
@@ -156,36 +156,26 @@ codex exec "Write a Hello World in Python"
 
 ### macOS
 
-No pre-built binaries available for macOS. Build from source.
+Download pre-built binaries from [GitHub Releases](https://github.com/xinovate/codex/releases). No Rust installation required.
 
-#### 1. Install Rust
+#### 1. Download and Extract
+
+Choose the package matching your CPU architecture:
 
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
+# Apple Silicon (M1/M2/M3/M4)
+curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-arm64.tar.gz | tar xz
+
+# Intel
+curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-x64.tar.gz | tar xz
 ```
 
-Verify installation:
+Not sure? Run `uname -m`. If it says `arm64`, use arm64; if `x86_64`, use x64.
+
+#### 2. Install
 
 ```shell
-rustc --version
-cargo --version
-```
-
-#### 2. Build
-
-```shell
-git clone https://github.com/xinovate/codex.git
-cd codex/codex-rs
-cargo build --release --bin codex
-```
-
-The binary will be at `target/release/codex`.
-
-#### 3. Install
-
-```shell
-sudo cp target/release/codex /usr/local/bin/
+sudo mv codex /usr/local/bin/
 ```
 
 Verify installation:
@@ -194,7 +184,7 @@ Verify installation:
 codex --version
 ```
 
-#### 4. Configure
+#### 3. Configure
 
 Create the config file `~/.codex/config.toml`:
 
@@ -211,7 +201,7 @@ wire_api = "chat"
 EOF
 ```
 
-#### 5. Set API Key
+#### 4. Set API Key
 
 ```shell
 # Current session only
@@ -225,7 +215,7 @@ echo 'export MIMO_API_KEY="your-api-key-here"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-#### 6. Run
+#### 5. Run
 
 ```shell
 # Interactive mode
