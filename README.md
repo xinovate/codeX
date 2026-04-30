@@ -14,10 +14,10 @@
 
 ```shell
 # x86_64（大多数 Intel/AMD 电脑）
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-x64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codex/releases/latest/download/codex-linux-x64.tar.gz | tar xz
 
 # ARM64（树莓派、Apple Silicon 虚拟机等）
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-linux-arm64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codex/releases/latest/download/codex-linux-arm64.tar.gz | tar xz
 ```
 
 不确定架构？运行 `uname -m`，`x86_64` 是 x64，`aarch64` 是 arm64。
@@ -164,10 +164,10 @@ codex exec "用Python写一个Hello World"
 
 ```shell
 # Apple Silicon (M1/M2/M3/M4)
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-arm64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codex/releases/latest/download/codex-macos-arm64.tar.gz | tar xz
 
 # Intel
-curl -L https://github.com/xinovate/codex/releases/download/v0.1.2/codex-macos-x64.tar.gz | tar xz
+curl -L https://github.com/xinovate/codex/releases/latest/download/codex-macos-x64.tar.gz | tar xz
 ```
 
 不确定？运行 `uname -m`，`arm64` 用 arm64，`x86_64` 用 x64。
@@ -224,6 +224,18 @@ codex
 # 单次任务
 codex exec "用Python写一个Hello World"
 ```
+
+## 更新
+
+安装后可使用命令自动更新到最新版本：
+
+```shell
+codex update
+```
+
+该命令会自动检测平台，从 GitHub Releases 下载最新版本并替换当前二进制。
+
+TUI 启动时也会自动检查新版本（每 20 小时一次），有新版本时会提示更新。
 
 ## 配置说明
 

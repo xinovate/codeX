@@ -115,6 +115,16 @@ codex
 codex exec "用Python写一个Hello World"
 ```
 
+### 6. 更新
+
+安装后可使用命令自动更新到最新版本：
+
+```bash
+codex update
+```
+
+该命令会自动检测平台，从 GitHub Releases 下载最新版本并替换当前二进制。
+
 ---
 
 ## 各 Provider 配置
