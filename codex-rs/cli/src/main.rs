@@ -645,6 +645,12 @@ fn run_update_command() -> anyhow::Result<()> {
             return Ok(());
         }
 
+        // Compare versions - skip if remote is older
+        if !is_newer_version(latest_version, current_version) {
+            println!("Already up to date (v{current_version}), latest release is v{latest_version}");
+            return Ok(());
+        }
+
         println!("New version available: v{latest_version}");
         println!("Downloading...");
 
@@ -715,6 +721,17 @@ fn determine_archive_name() -> anyhow::Result<String> {
         ("macos", "aarch64") => Ok("codex-macos-arm64.tar.gz".to_string()),
         ("windows", "x86_64") => Ok("codex-windows-x64.zip".to_string()),
         _ => anyhow::bail!("Unsupported platform: {os}/{arch}"),
+    }
+}
+
+fn is_newer_version(latest: &str, current: &str) -> bool {
+    fn parse(v: &str) -> Option<(u64, u64, u64)> {
+        let mut parts = v.trim().split('.');
+        Some((parts.next()?.parse().ok()?, parts.next()?.parse().ok()?, parts.next()?.parse().ok()?))
+    }
+    match (parse(latest), parse(current)) {
+        (Some(l), Some(c)) => l > c,
+        _ => false,
     }
 }
 
