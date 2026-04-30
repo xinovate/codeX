@@ -10,17 +10,17 @@ A fork of OpenAI's Codex CLI with built-in support for Chinese model providers (
 
 | 平台 | 文件 |
 |------|------|
-| Linux (x86_64) | `codex-x86_64-unknown-linux-gnu.tar.gz` |
-| Linux (ARM64) | `codex-aarch64-unknown-linux-gnu.tar.gz` |
-| Windows (x86_64) | `codex-x86_64-pc-windows-msvc.zip` |
+| Linux (x86_64) | `codex-linux-x64.tar.gz` |
+| Linux (ARM64) | `codex-linux-arm64.tar.gz` |
+| Windows (x86_64) | `codex-windows-x64.zip` |
 
 ```shell
 # Linux
-tar xzf codex-x86_64-unknown-linux-gnu.tar.gz
+tar xzf codex-linux-x64.tar.gz
 sudo mv codex /usr/local/bin/
 
 # Windows (PowerShell)
-Expand-Archive codex-x86_64-pc-windows-msvc.zip -DestinationPath C:\codex
+Expand-Archive codex-windows-x64.zip -DestinationPath C:\codex
 # 将 C:\codex 添加到 PATH
 ```
 
