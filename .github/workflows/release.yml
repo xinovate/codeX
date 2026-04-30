@@ -12,6 +12,7 @@ concurrency:
 jobs:
   build:
     name: ${{ matrix.target }}
+    if: github.event.base_ref == 'refs/heads/custom_provider'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
@@ -82,6 +83,7 @@ jobs:
 
   release:
     needs: build
+    if: github.event.base_ref == 'refs/heads/custom_provider'
     runs-on: ubuntu-latest
     permissions:
       contents: write
