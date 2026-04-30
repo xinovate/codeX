@@ -1,6 +1,6 @@
 # Codex CLI - China Provider Fork
 
-A fork of OpenAI's Codex CLI with built-in support for Chinese model providers (Volcengine, Kimi, Doubao, XiaomiMimo, etc.) that use the OpenAI Chat Completions API.
+A fork of OpenAI's Codex CLI (based on commit `7d72fc8f5`, 2026-04-28) with built-in support for Chinese model providers (Volcengine, Kimi, Doubao, XiaomiMimo, etc.) that use the OpenAI Chat Completions API.
 
 ## 安装 / Install
 
