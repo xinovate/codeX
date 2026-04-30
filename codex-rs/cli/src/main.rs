@@ -618,21 +618,134 @@ fn run_update_action(action: UpdateAction) -> anyhow::Result<()> {
 }
 
 fn run_update_command() -> anyhow::Result<()> {
-    #[cfg(debug_assertions)]
-    {
-        anyhow::bail!(
-            "`codex update` is not available in debug builds. Install a release build of Codex to use this command."
-        );
-    }
+    let current_version = env!("CARGO_PKG_VERSION");
+    println!("Current version: v{current_version}");
+    println!("Checking for updates...");
 
-    #[cfg(not(debug_assertions))]
-    {
-        let Some(action) = codex_tui::get_update_action() else {
-            anyhow::bail!(
-                "Could not detect the Codex installation method. Please update manually: https://developers.openai.com/codex/cli/"
-            );
-        };
-        run_update_action(action)
+    let rt = tokio::runtime::Runtime::new()?;
+    let result: anyhow::Result<()> = rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .user_agent("codex-update")
+            .build()?;
+
+        // Fetch latest release info
+        let resp = client
+            .get("https://api.github.com/repos/xinovate/codex/releases/latest")
+            .send()
+            .await?
+            .error_for_status()?;
+        let release: serde_json::Value = resp.json().await?;
+        let tag_name = release["tag_name"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing tag_name in release"))?;
+        let latest_version = tag_name.strip_prefix('v').unwrap_or(tag_name);
+
+        if latest_version == current_version {
+            println!("Already up to date (v{current_version})");
+            return Ok(());
+        }
+
+        println!("New version available: v{latest_version}");
+        println!("Downloading...");
+
+        // Determine archive name based on platform
+        let archive_name = determine_archive_name()?;
+        let download_url = format!(
+            "https://github.com/xinovate/codex/releases/download/{tag_name}/{archive_name}"
+        );
+
+        // Download archive
+        let resp = client.get(&download_url).send().await?.error_for_status()?;
+        let bytes = resp.bytes().await?;
+
+        // Find current binary path
+        let current_exe = std::env::current_exe()?;
+        let exe_dir = current_exe.parent().unwrap();
+
+        // Extract binary from archive
+        let binary_name = if cfg!(windows) { "codex.exe" } else { "codex" };
+        extract_binary(&bytes, &archive_name, exe_dir, binary_name)?;
+
+        // Replace current binary
+        let new_binary = exe_dir.join(binary_name);
+        if new_binary.exists() && new_binary != current_exe {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&new_binary, std::fs::Permissions::from_mode(0o755))?;
+            }
+            // On Unix, use rename which is atomic
+            #[cfg(unix)]
+            std::fs::rename(&new_binary, &current_exe)?;
+            #[cfg(windows)]
+            {
+                // Windows can't replace a running binary, copy to side and ask user
+                let backup = current_exe.with_extension("exe.new");
+                std::fs::copy(&new_binary, &backup)?;
+                std::fs::remove_file(&new_binary)?;
+                println!("\nUpdate downloaded to: {}", backup.display());
+                println!("Please replace the current binary manually:");
+                println!("  Move {} -> {}", backup.display(), current_exe.display());
+                return Ok(());
+            }
+        }
+
+        Ok(())
+    });
+
+    match result {
+        Ok(()) => {
+            println!("\nUpdate complete! Please restart Codex.");
+            Ok(())
+        }
+        Err(e) => {
+            anyhow::bail!("Update failed: {e}\nPlease download manually from https://github.com/xinovate/codex/releases");
+        }
+    }
+}
+
+fn determine_archive_name() -> anyhow::Result<String> {
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+    match (os, arch) {
+        ("linux", "x86_64") => Ok("codex-linux-x64.tar.gz".to_string()),
+        ("linux", "aarch64") => Ok("codex-linux-arm64.tar.gz".to_string()),
+        ("macos", "x86_64") => Ok("codex-macos-x64.tar.gz".to_string()),
+        ("macos", "aarch64") => Ok("codex-macos-arm64.tar.gz".to_string()),
+        ("windows", "x86_64") => Ok("codex-windows-x64.zip".to_string()),
+        _ => anyhow::bail!("Unsupported platform: {os}/{arch}"),
+    }
+}
+
+fn extract_binary(
+    bytes: &[u8],
+    archive_name: &str,
+    dest_dir: &std::path::Path,
+    binary_name: &str,
+) -> anyhow::Result<()> {
+    if archive_name.ends_with(".tar.gz") {
+        let decoder = flate2::read::GzDecoder::new(bytes);
+        let mut archive = tar::Archive::new(decoder);
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            let path = entry.path()?;
+            if path.file_name().map(|n| n == binary_name).unwrap_or(false) {
+                let dest = dest_dir.join(binary_name);
+                entry.unpack(&dest)?;
+                return Ok(());
+            }
+        }
+        anyhow::bail!("Binary '{binary_name}' not found in archive");
+    } else if archive_name.ends_with(".zip") {
+        let reader = std::io::Cursor::new(bytes);
+        let mut archive = zip::ZipArchive::new(reader)?;
+        let mut file = archive.by_name(binary_name)?;
+        let dest = dest_dir.join(binary_name);
+        let mut dest_file = std::fs::File::create(&dest)?;
+        std::io::copy(&mut file, &mut dest_file)?;
+        Ok(())
+    } else {
+        anyhow::bail!("Unknown archive format: {archive_name}");
     }
 }
 
