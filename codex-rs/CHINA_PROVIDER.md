@@ -175,11 +175,9 @@ wire_api = "chat"
 
 ## 模型元数据配置（可选）
 
-启动时如果提示 `Model metadata not found`，不影响基本功能，但可以配置消除提示。
+已知的国内模型（`deepseek-*`、`doubao-*`、`kimi-*`、`glm-*`、`qwen-*`、`mimo*` 等）会自动识别，无需额外配置。
 
-### 1. 创建元数据文件
-
-创建 `~/.codex/custom_models.json`（Windows: `%USERPROFILE%\.codex\custom_models.json`）：
+如果使用非标准命名的模型，可以手动创建 `~/.codex/custom_models.json`（Windows: `%USERPROFILE%\.codex\custom_models.json`）来提供元数据：
 
 ```json
 {
