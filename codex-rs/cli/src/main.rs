@@ -622,8 +622,8 @@ fn run_update_command() -> anyhow::Result<()> {
     println!("Current version: v{current_version}");
     println!("Checking for updates...");
 
-    let rt = tokio::runtime::Runtime::new()?;
-    let result: anyhow::Result<()> = rt.block_on(async {
+    let result: anyhow::Result<()> = tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
         let client = reqwest::Client::builder()
             .user_agent("codex-update")
             .build()?;
@@ -691,6 +691,7 @@ fn run_update_command() -> anyhow::Result<()> {
         }
 
         Ok(())
+        })
     });
 
     match result {
