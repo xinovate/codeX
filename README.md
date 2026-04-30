@@ -1,6 +1,6 @@
 # Codex CLI - China Provider Fork
 
-基于 OpenAI Codex CLI 的 fork（基于 commit `7d72fc8f5`，2026-04-28），内置支持国内大模型服务商（火山引擎/豆包、Kimi Code、小米 Mimo、DeepSeek 等），通过 OpenAI Chat Completions API 接入。
+基于 OpenAI Codex CLI 的 fork（基于 commit `8a97f3cf03`，2026-04-30），内置支持国内大模型服务商（火山引擎/豆包、Kimi Code、小米 Mimo、DeepSeek 等），通过 OpenAI Chat Completions API 接入。
 
 ## 安装
 
