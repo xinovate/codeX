@@ -17,7 +17,6 @@ use codex_api::SharedAuthProvider;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_model_provider_info::ModelProviderInfo;
-use codex_models_manager::collaboration_mode_presets::CollaborationModesConfig;
 use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::manager::StaticModelsManager;
 use codex_protocol::error::Result;
@@ -90,16 +89,11 @@ impl ModelProvider for ChinaModelProvider {
         &self,
         _codex_home: PathBuf,
         config_model_catalog: Option<ModelsResponse>,
-        collaboration_modes_config: CollaborationModesConfig,
     ) -> SharedModelsManager {
         // China providers always use static models manager since
         // the /models endpoint may not be available.
         let model_catalog =
             config_model_catalog.unwrap_or_else(|| ModelsResponse { models: vec![] });
-        Arc::new(StaticModelsManager::new(
-            None,
-            model_catalog,
-            collaboration_modes_config,
-        ))
+        Arc::new(StaticModelsManager::new(None, model_catalog))
     }
 }

@@ -498,7 +498,10 @@ fn spawn_chat_completions_stream(
         }
     });
 
-    ResponseStream { rx_event }
+    ResponseStream {
+        rx_event,
+        upstream_request_id: None,
+    }
 }
 
 // ============================================================

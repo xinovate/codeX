@@ -1349,7 +1349,7 @@ impl ModelClientSession {
             Err(ApiError::Transport(
                 unauthorized_transport @ TransportError::Http { status, .. },
             )) if status == StatusCode::UNAUTHORIZED => {
-                inference_trace_attempt.record_failed(&unauthorized_transport, &[]);
+                inference_trace_attempt.record_failed(&unauthorized_transport, None, &[]);
                 Err(map_api_error(ApiError::Transport(unauthorized_transport)))
             }
             Err(err) => Err(map_api_error(err)),
