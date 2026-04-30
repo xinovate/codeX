@@ -26,9 +26,10 @@
 | Linux x86_64 | `codex-linux-x64.tar.gz` |
 | Linux ARM64 | `codex-linux-arm64.tar.gz` |
 | Windows x64 | `codex-windows-x64.zip` |
-| macOS | 无预编译包，需从源码构建 |
+| macOS ARM64 (Apple Silicon) | `codex-macos-arm64.tar.gz` |
+| macOS x64 (Intel) | `codex-macos-x64.tar.gz` |
 
-**方式二：从源码构建（macOS 或需要最新代码时）**
+**方式二：从源码构建（需要最新代码时）**
 
 需要先安装 [Rust](https://rustup.rs/)，然后：
 
