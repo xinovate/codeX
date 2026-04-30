@@ -73,7 +73,7 @@ wire_api = "chat"
 | `model` | 是 | 模型名称，如 `"mimo-model-name"`、`"doubao-pro-32k"` |
 | `model_provider` | 是 | Provider 标识，对应 `[model_providers.xxx]` 中的 `xxx` |
 | `name` | 是 | Provider 显示名称 |
-| `base_url` | 是 | API 地址，必须以 `/v1` 结尾 |
+| `base_url` | 是 | API 地址，如 `https://api.xiaomimimo.com/v1`、`https://api.deepseek.com` |
 | `env_key` | 是 | API Key 对应的环境变量名 |
 | `wire_api` | 是 | 固定填 `"chat"`（小写），国内 provider 必须设置 |
 
@@ -125,6 +125,23 @@ wire_api = "chat"
 ```
 
 环境变量：`export MIMO_API_KEY="你的API Key"`
+
+### DeepSeek
+
+```toml
+model = "deepseek-v4-flash"
+model_provider = "deepseek"
+
+[model_providers.deepseek]
+name = "DeepSeek"
+base_url = "https://api.deepseek.com"
+env_key = "DEEPSEEK_API_KEY"
+wire_api = "chat"
+```
+
+环境变量：`export DEEPSEEK_API_KEY="你的API Key"`
+
+可用模型：`deepseek-v4-flash`（非思考）、`deepseek-v4-pro`（思考）。旧名称 `deepseek-chat`、`deepseek-reasoner` 将于 2026/07/24 弃用。
 
 ### 火山引擎（豆包）
 
@@ -247,7 +264,7 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 
 | Provider | 思考模型示例 | 思考模式 | 说明 |
 |----------|-------------|---------|------|
-| DeepSeek | deepseek-r1, deepseek-v3 | 支持 | 流式返回 `reasoning_content`，后续请求不回传（已自动处理） |
+| DeepSeek | deepseek-v4-pro, deepseek-reasoner | 支持 | 流式返回 `reasoning_content`，后续请求不回传（已自动处理） |
 | 火山引擎/豆包 | doubao-1.5-thinking-pro | 支持 | 同 DeepSeek 格式 |
 | Kimi/月之暗面 | kimi-k2 | 支持 | 同 DeepSeek 格式 |
 | GLM/智谱 | glm-z1, glm-z1-air | 支持 | 同 DeepSeek 格式 |
@@ -258,7 +275,7 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 使用思考模型时，直接在 `config.toml` 中指定模型名称即可：
 
 ```toml
-model = "deepseek-r1"
+model = "deepseek-v4-pro"
 model_provider = "deepseek"
 ```
 
@@ -331,7 +348,7 @@ wire_api = "chat"
 | `model` | Yes | Model name, e.g. `"doubao-pro-32k"` |
 | `model_provider` | Yes | Provider key, matches `[model_providers.xxx]` |
 | `name` | Yes | Display name |
-| `base_url` | Yes | API endpoint, must end with `/v1` |
+| `base_url` | Yes | API endpoint, e.g. `https://api.xiaomimimo.com/v1` or `https://api.deepseek.com` |
 | `env_key` | Yes | Environment variable name for API key |
 | `wire_api` | Yes | Must be `"chat"` (lowercase) for all Chinese providers |
 
