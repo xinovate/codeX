@@ -32,6 +32,12 @@ jobs:
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive_name: codex-windows-x64.zip
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            archive_name: codex-macos-arm64.tar.gz
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            archive_name: codex-macos-x64.tar.gz
 
     steps:
       - uses: actions/checkout@v4
