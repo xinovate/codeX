@@ -1286,17 +1286,16 @@ impl ModelClientSession {
         let client_setup = self.client.current_client_setup().await?;
 
         let transport = ReqwestTransport::new(build_reqwest_client());
-        let (request_telemetry, sse_telemetry) =
-            Self::build_streaming_telemetry(
-                session_telemetry,
-                AuthRequestTelemetryContext::new(
-                    client_setup.auth.as_ref().map(CodexAuth::auth_mode),
-                    client_setup.api_auth.as_ref(),
-                    PendingUnauthorizedRetry::default(),
-                ),
-                RequestRouteTelemetry::for_endpoint("chat/completions"),
-                self.client.state.auth_env_telemetry.clone(),
-            );
+        let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
+            session_telemetry,
+            AuthRequestTelemetryContext::new(
+                client_setup.auth.as_ref().map(CodexAuth::auth_mode),
+                client_setup.api_auth.as_ref(),
+                PendingUnauthorizedRetry::default(),
+            ),
+            RequestRouteTelemetry::for_endpoint("chat/completions"),
+            self.client.state.auth_env_telemetry.clone(),
+        );
         let compression = self.responses_request_compression(client_setup.auth.as_ref());
 
         let request = self.build_responses_request(
