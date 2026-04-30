@@ -597,7 +597,17 @@ fn convert_request_body(responses_body: &mut Value) {
                     // path is never hit for Mimo. The `continue` skips the
                     // role:"tool" → role:"user" fallback below.
                     let call_id = obj.get("call_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let output = obj.get("output").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    // `output` can be a plain string or an array of content items
+                    // (e.g. [{"type":"output_text","text":"..."}]).
+                    let output = match obj.get("output") {
+                        Some(Value::String(s)) => s.clone(),
+                        Some(Value::Array(arr)) => arr
+                            .iter()
+                            .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
+                            .collect::<Vec<_>>()
+                            .join(""),
+                        _ => String::new(),
+                    };
                     *obj = Map::new();
                     obj.insert("role".to_string(), Value::String("tool".to_string()));
                     obj.insert("tool_call_id".to_string(), Value::String(call_id));
@@ -703,6 +713,61 @@ fn convert_request_body(responses_body: &mut Value) {
                 .map(|o| o.get("__remove__").is_some())
                 .unwrap_or(false)
         });
+
+        // Merge consecutive assistant messages with tool_calls into a single
+        // assistant message. Responses API may emit one assistant message per
+        // tool call, but Chat Completions API requires all tool_calls to be in
+        // a single assistant message, immediately followed by tool responses.
+        // Input:  [assistant(tc_A), assistant(tc_B), tool(A), tool(B)]
+        // Output: [assistant(tc_A+tc_B), tool(A), tool(B)]
+        let mut merged: Vec<Value> = Vec::with_capacity(messages.len());
+        for msg in messages {
+            let is_assistant_with_tools = msg
+                .as_object()
+                .map(|o| {
+                    o.get("role").and_then(|r| r.as_str()) == Some("assistant")
+                        && o.get("tool_calls").is_some()
+                })
+                .unwrap_or(false);
+
+            if is_assistant_with_tools {
+                // Check if the last merged message is also an assistant with tool_calls
+                if let Some(last) = merged.last_mut() {
+                    let last_is_assistant_with_tools = last
+                        .as_object()
+                        .map(|o| {
+                            o.get("role").and_then(|r| r.as_str()) == Some("assistant")
+                                && o.get("tool_calls").is_some()
+                        })
+                        .unwrap_or(false);
+                    if last_is_assistant_with_tools {
+                        // Merge tool_calls from current into last
+                        if let (Some(last_obj), Some(cur_obj)) =
+                            (last.as_object_mut(), msg.as_object())
+                        {
+                            if let (Some(Value::Array(last_tc)), Some(Value::Array(cur_tc))) = (
+                                last_obj.get_mut("tool_calls"),
+                                cur_obj.get("tool_calls"),
+                            ) {
+                                last_tc.extend(cur_tc.iter().cloned());
+                            }
+                            // Keep the last assistant's content if non-null, otherwise use current
+                            if last_obj
+                                .get("content")
+                                .map_or(true, |c| c.is_null())
+                            {
+                                if let Some(cur_content) = cur_obj.get("content") {
+                                    last_obj.insert("content".to_string(), cur_content.clone());
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
+            merged.push(msg);
+        }
+        messages = merged;
 
         // 3. Prepend instructions as system message
         if let Some(instructions) = obj.remove("instructions") {
@@ -1029,6 +1094,39 @@ mod tests {
         assert_eq!(messages[2]["role"], "tool");
         assert_eq!(messages[2]["tool_call_id"], "call_123");
         assert_eq!(messages[2]["content"], "file1.txt\nfile2.txt");
+    }
+
+    #[test]
+    fn merges_consecutive_assistant_tool_calls() {
+        // Responses API may emit one assistant message per tool call.
+        // Chat Completions requires all tool_calls in a single assistant message.
+        let mut body = json!({
+            "model": "test",
+            "input": [
+                {"role": "user", "content": "do two things"},
+                {"type": "function_call", "id": "fc_1", "call_id": "call_A", "name": "exec", "arguments": "{\"cmd\":\"ls\"}"},
+                {"type": "function_call", "id": "fc_2", "call_id": "call_B", "name": "exec", "arguments": "{\"cmd\":\"pwd\"}"},
+                {"type": "function_call_output", "call_id": "call_A", "output": "file1.txt"},
+                {"type": "function_call_output", "call_id": "call_B", "output": "/tmp"},
+            ],
+        });
+
+        convert_request_body(&mut body);
+
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 4); // user, assistant(merged), tool(A), tool(B)
+        assert_eq!(messages[0]["role"], "user");
+        // Two function_calls merged into one assistant message
+        assert_eq!(messages[1]["role"], "assistant");
+        let tool_calls = messages[1]["tool_calls"].as_array().unwrap();
+        assert_eq!(tool_calls.len(), 2);
+        assert_eq!(tool_calls[0]["id"], "call_A");
+        assert_eq!(tool_calls[1]["id"], "call_B");
+        // Tool responses
+        assert_eq!(messages[2]["role"], "tool");
+        assert_eq!(messages[2]["tool_call_id"], "call_A");
+        assert_eq!(messages[3]["role"], "tool");
+        assert_eq!(messages[3]["tool_call_id"], "call_B");
     }
 
     #[test]
