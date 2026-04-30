@@ -247,13 +247,13 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 
 | Provider | 思考模型示例 | 思考模式 | 说明 |
 |----------|-------------|---------|------|
-| DeepSeek | deepseek-r1, deepseek-v3 | 支持 | 必须回传 `reasoning_content`（已自动处理） |
+| DeepSeek | deepseek-r1, deepseek-v3 | 支持 | 流式返回 `reasoning_content`，后续请求不回传（已自动处理） |
 | 火山引擎/豆包 | doubao-1.5-thinking-pro | 支持 | 同 DeepSeek 格式 |
 | Kimi/月之暗面 | kimi-k2 | 支持 | 同 DeepSeek 格式 |
 | GLM/智谱 | glm-z1, glm-z1-air | 支持 | 同 DeepSeek 格式 |
 | XiaomiMimo | MiMo-7B | 取决于部署方式 | 开源模型，API 格式取决于服务框架 |
 
-所有支持思考模式的 Provider 统一使用 `reasoning_content` 字段。CLI 会自动处理该字段的接收和回传，无需额外配置。
+所有支持思考模式的 Provider 流式返回时使用 `reasoning_content` 字段传递思考内容。CLI 会自动处理该字段的接收，并在后续请求中正确剥离，无需额外配置。
 
 使用思考模型时，直接在 `config.toml` 中指定模型名称即可：
 

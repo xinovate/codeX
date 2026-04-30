@@ -564,9 +564,8 @@ fn convert_request_body(responses_body: &mut Value) {
         //    Responses API uses "function_call" and "function_call_output" types
         //    that have no "role" field — convert them to standard message format.
         //    Also handle role conversions and content type conversions.
-        //    Reasoning items are collected and attached to the next assistant message
-        //    as `reasoning_content` (required by DeepSeek and similar providers).
-        let mut pending_reasoning_content: Option<String> = None;
+        //    Reasoning items are stripped entirely — DeepSeek docs explicitly state
+        //    that passing reasoning_content in messages causes 400 errors.
         for msg in &mut messages {
             if let Some(obj) = msg.as_object_mut() {
                 // Handle Responses API function_call items (no role field)
@@ -601,26 +600,9 @@ fn convert_request_body(responses_body: &mut Value) {
                     continue;
                 }
                 if msg_type == Some("reasoning") {
-                    // Extract reasoning content to pass back in the next assistant
-                    // message. DeepSeek and similar providers require reasoning_content
-                    // to be included in subsequent requests.
-                    let reasoning_text: String = obj
-                        .get("content")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|item| {
-                                    item.get("text").and_then(|t| t.as_str())
-                                })
-                                .collect::<Vec<_>>()
-                                .join("")
-                        })
-                        .unwrap_or_default();
-                    if !reasoning_text.is_empty() {
-                        let existing = pending_reasoning_content.get_or_insert_with(String::new);
-                        existing.push_str(&reasoning_text);
-                    }
-                    // Mark for removal — will be filtered out after the loop
+                    // Strip reasoning items entirely. DeepSeek docs explicitly state:
+                    // "如果您在输入的 messages 序列中，传入了 reasoning_content，
+                    // API 会返回 400 错误。"
                     *obj = Map::new();
                     obj.insert("__remove__".to_string(), Value::Bool(true));
                     continue;
@@ -657,14 +639,6 @@ fn convert_request_body(responses_body: &mut Value) {
                     }
                 }
                 let is_assistant = obj.get("role").and_then(|r| r.as_str()) == Some("assistant");
-
-                // Attach accumulated reasoning content to this assistant message.
-                // DeepSeek requires reasoning_content to be passed back in subsequent requests.
-                if is_assistant {
-                    if let Some(reasoning) = pending_reasoning_content.take() {
-                        obj.insert("reasoning_content".to_string(), Value::String(reasoning));
-                    }
-                }
 
                 // Convert content item types within arrays
                 if let Some(content) = obj.get_mut("content") {
@@ -992,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn attaches_reasoning_content_to_next_assistant_message() {
+    fn strips_reasoning_items_from_messages() {
         let mut body = json!({
             "model": "test",
             "input": [
@@ -1009,13 +983,13 @@ mod tests {
         convert_request_body(&mut body);
 
         let messages = body["messages"].as_array().unwrap();
-        // Reasoning item should be removed
+        // Reasoning item should be stripped entirely (not passed back)
         assert_eq!(messages.len(), 3);
         assert_eq!(messages[0]["role"], "user");
-        // Assistant message should have reasoning_content attached
+        // Assistant message should NOT have reasoning_content
         assert_eq!(messages[1]["role"], "assistant");
         assert_eq!(messages[1]["content"], "Here is my answer.");
-        assert_eq!(messages[1]["reasoning_content"], "Let me think...");
+        assert!(messages[1].get("reasoning_content").is_none());
         assert_eq!(messages[2]["role"], "user");
     }
 
