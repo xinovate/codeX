@@ -44,6 +44,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+        if: matrix.target != 'x86_64-apple-darwin'
 
       - name: Install system deps (Linux)
         if: runner.os == 'Linux'
@@ -51,9 +52,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcap-dev pkg-config
 
-      - name: Build (cross-compile x86_64 on ARM Mac)
+      - name: Install x86_64 Rust (Intel Mac)
         if: matrix.target == 'x86_64-apple-darwin'
-        run: arch -x86_64 cargo build --release --bin codex
+        run: arch -x86_64 /bin/bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable"
+
+      - name: Build (Intel Mac via Rosetta)
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: arch -x86_64 $HOME/.cargo/bin/cargo build --release --bin codex
 
       - name: Build
         if: matrix.target != 'x86_64-apple-darwin'
