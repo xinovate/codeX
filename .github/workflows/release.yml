@@ -36,7 +36,7 @@ jobs:
           - runner: macos-latest
             target: aarch64-apple-darwin
             archive_name: codex-macos-arm64.tar.gz
-          - runner: macos-13
+          - runner: macos-14
             target: x86_64-apple-darwin
             archive_name: codex-macos-x64.tar.gz
 
@@ -51,28 +51,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcap-dev pkg-config
 
+      - name: Add cross-compile target
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: rustup target add x86_64-apple-darwin
+
       - name: Build
-        run: cargo build --release --bin codex
+        run: cargo build --release --bin codex --target ${{ matrix.target }}
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          cd target/release
+          cd target/${{ matrix.target }}/release
+          tar czf ${{ matrix.archive_name }} codex
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
           tar czf ${{ matrix.archive_name }} codex
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path target/release/codex.exe -DestinationPath ${{ matrix.archive_name }}
+          Compress-Archive -Path target/${{ matrix.target }}/release/codex.exe -DestinationPath ${{ matrix.archive_name }}
 
-      - name: Upload (Linux)
-        if: runner.os == 'Linux'
+      - name: Upload (Linux/macOS)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.archive_name }}
-          path: codex-rs/target/release/${{ matrix.archive_name }}
+          path: codex-rs/target/${{ matrix.target }}/release/${{ matrix.archive_name }}
 
       - name: Upload (Windows)
         if: runner.os == 'Windows'
