@@ -702,7 +702,6 @@ fn run_update_command() -> anyhow::Result<()> {
 
     match result {
         Ok(()) => Ok(()),
-        }
         Err(e) => {
             anyhow::bail!("Update failed: {e}\nPlease download manually from https://github.com/xinovate/codex/releases");
         }
