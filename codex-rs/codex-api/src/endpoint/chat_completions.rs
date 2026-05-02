@@ -811,16 +811,25 @@ fn convert_request_body(responses_body: &mut Value) {
     obj.remove("prompt_cache_key");
     obj.remove("service_tier");
     obj.remove("client_metadata");
-    obj.remove("reasoning");
+
+    // 5b. Convert Responses API `reasoning` → Chat Completions `thinking`.
+    //     reasoning.effort: "none" → thinking disabled, otherwise → enabled.
+    let reasoning_effort = obj
+        .remove("reasoning")
+        .and_then(|r| r.get("effort").cloned())
+        .and_then(|e| e.as_str().map(String::from));
+    match reasoning_effort.as_deref() {
+        Some("none") | None => {
+            chat_obj.insert("thinking".to_string(), json!({"type": "disabled"}));
+        }
+        _ => {
+            chat_obj.insert("thinking".to_string(), json!({"type": "enabled"}));
+        }
+    }
+
     obj.remove("parallel_tool_calls");
 
-    // 6. Disable thinking mode for DeepSeek and similar providers.
-    //    DeepSeek's deepseek-v4-flash has thinking enabled by default, which
-    //    returns reasoning_content that must be round-tripped. Since Codex
-    //    doesn't support this for Chat Completions providers, disable it.
-    chat_obj.insert("thinking".to_string(), json!({"type": "disabled"}));
-
-    // 7. Convert tools from Responses API format to Chat Completions format
+    // 6. Convert tools from Responses API format to Chat Completions format
     //    Responses:  {"type":"function", "name":"x", "description":"...", "parameters":{...}}
     //    Chat:      {"type":"function", "function":{"name":"x", "description":"...", "parameters":{...}}}
     if let Some(tools) = obj.remove("tools") {
