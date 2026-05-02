@@ -162,17 +162,11 @@ codex exec "用Python写一个Hello World"
 
 #### 1. 下载解压
 
-根据 CPU 架构选择对应包：
+仅支持 Apple Silicon (M1/M2/M3/M4)：
 
 ```shell
-# Apple Silicon (M1/M2/M3/M4)
 curl -L https://github.com/xinovate/codex/releases/latest/download/codex-macos-arm64.tar.gz | tar xz
-
-# Intel
-curl -L https://github.com/xinovate/codex/releases/latest/download/codex-macos-x64.tar.gz | tar xz
 ```
-
-不确定？运行 `uname -m`，`arm64` 用 arm64，`x86_64` 用 x64。
 
 #### 2. 安装
 

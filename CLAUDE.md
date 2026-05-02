@@ -46,7 +46,6 @@ GitHub Actions 自动构建以下平台：
 - Linux x64 / arm64
 - Windows x64
 - macOS arm64 (Apple Silicon)
-- macOS x64 (Intel)
 
 **版本号位置：** `codex-rs/Cargo.toml` 第 112 行 `version = "x.y.z"`
 - 编译时写入二进制，影响 `codex --version` 输出

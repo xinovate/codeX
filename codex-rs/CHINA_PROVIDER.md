@@ -27,7 +27,6 @@
 | Linux ARM64 | `codex-linux-arm64.tar.gz` |
 | Windows x64 | `codex-windows-x64.zip` |
 | macOS ARM64 (Apple Silicon) | `codex-macos-arm64.tar.gz` |
-| macOS x64 (Intel) | `codex-macos-x64.tar.gz` |
 
 **方式二：从源码构建（需要最新代码时）**
 
