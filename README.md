@@ -1,5 +1,7 @@
 # Codex CLI - China Provider Fork
 
+> **与小米 Mimo 联合共建** - 小米大模型 core 团队为本项目提供 API 资源，共同推进国内 AI 编程工具生态
+
 基于 OpenAI Codex CLI 的 fork（基于 commit `8a97f3cf03`，2026-04-30），内置支持国内大模型服务商（火山引擎/豆包、Kimi Code、小米 Mimo、DeepSeek 等），通过 OpenAI Chat Completions API 接入。
 
 ## 安装
