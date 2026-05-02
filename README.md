@@ -2,7 +2,7 @@
 
 > **与小米 Mimo 联合共建** - 小米大模型 core 团队为本项目提供 API 资源，共同推进国内 AI 编程工具生态
 
-基于 OpenAI Codex CLI 的 fork（基于 commit `8a97f3cf03`，2026-04-30），内置支持国内大模型服务商（火山引擎/豆包、Kimi Code、小米 Mimo、DeepSeek 等），通过 OpenAI Chat Completions API 接入。
+基于 OpenAI Codex CLI 的 fork（基于 commit `8a97f3cf03`，2026-04-30），内置支持国内大模型服务商（小米 Mimo、DeepSeek、Kimi Code、火山引擎/豆包 等），通过 OpenAI Chat Completions API 接入。
 
 ## 安装
 
@@ -45,12 +45,12 @@ codex --version
 ```shell
 mkdir -p ~/.codex
 cat > ~/.codex/config.toml << 'EOF'
-model_provider = "mimo"
+model_provider = "mimo-tp"
 
-[model_providers.mimo]
-name = "XiaomiMimo"
-base_url = "https://api.xiaomimimo.com/v1"
-env_key = "MIMO_API_KEY"
+[model_providers.mimo-tp]
+name = "XiaomiMimoTokenPlan"
+base_url = "https://token-plan-cn.xiaomimimo.com/v1"
+env_key = "MIMO_TP_API_KEY"
 wire_api = "chat"
 EOF
 ```
@@ -59,17 +59,17 @@ EOF
 
 ```shell
 # 当前会话
-export MIMO_API_KEY="你的API Key"
+export MIMO_TP_API_KEY="你的API Key"
 ```
 
 永久生效，添加到 shell 配置：
 
 ```shell
 # bash 用户
-echo 'export MIMO_API_KEY="你的API Key"' >> ~/.bashrc
+echo 'export MIMO_TP_API_KEY="你的API Key"' >> ~/.bashrc
 
 # zsh 用户
-echo 'export MIMO_API_KEY="你的API Key"' >> ~/.zshrc
+echo 'export MIMO_TP_API_KEY="你的API Key"' >> ~/.zshrc
 ```
 
 然后重新打开终端，或执行 `source ~/.bashrc`（或 `source ~/.zshrc`）。
@@ -114,12 +114,12 @@ codex --version
 创建配置文件 `%USERPROFILE%\.codex\config.toml`（即 `C:\Users\<用户名>\.codex\config.toml`）：
 
 ```toml
-model_provider = "mimo"
+model_provider = "mimo-tp"
 
-[model_providers.mimo]
-name = "XiaomiMimo"
-base_url = "https://api.xiaomimimo.com/v1"
-env_key = "MIMO_API_KEY"
+[model_providers.mimo-tp]
+name = "XiaomiMimoTokenPlan"
+base_url = "https://token-plan-cn.xiaomimimo.com/v1"
+env_key = "MIMO_TP_API_KEY"
 wire_api = "chat"
 ```
 
@@ -135,7 +135,7 @@ notepad "$env:USERPROFILE\.codex\config.toml"
 PowerShell 中设置环境变量（当前会话）：
 
 ```powershell
-$env:MIMO_API_KEY = "你的API Key"
+$env:MIMO_TP_API_KEY = "你的API Key"
 ```
 
 永久生效（重启后保留），使用系统设置：
@@ -143,7 +143,7 @@ $env:MIMO_API_KEY = "你的API Key"
 1. 按 `Win + S`，搜索 **"环境变量"**，点击 **"编辑系统环境变量"**
 2. 点击 **"环境变量"** 按钮
 3. 在 **"用户变量"** 中，点击 **"新建"**
-4. 变量名：`MIMO_API_KEY`，变量值：你的 API Key
+4. 变量名：`MIMO_TP_API_KEY`，变量值：你的 API Key
 5. 点击 **"确定"** 保存
 
 #### 5. 使用
@@ -187,12 +187,12 @@ codex --version
 ```shell
 mkdir -p ~/.codex
 cat > ~/.codex/config.toml << 'EOF'
-model_provider = "mimo"
+model_provider = "mimo-tp"
 
-[model_providers.mimo]
-name = "XiaomiMimo"
-base_url = "https://api.xiaomimimo.com/v1"
-env_key = "MIMO_API_KEY"
+[model_providers.mimo-tp]
+name = "XiaomiMimoTokenPlan"
+base_url = "https://token-plan-cn.xiaomimimo.com/v1"
+env_key = "MIMO_TP_API_KEY"
 wire_api = "chat"
 EOF
 ```
@@ -201,13 +201,13 @@ EOF
 
 ```shell
 # 当前会话
-export MIMO_API_KEY="你的API Key"
+export MIMO_TP_API_KEY="你的API Key"
 ```
 
 永久生效，添加到 shell 配置（macOS 默认 zsh）：
 
 ```shell
-echo 'export MIMO_API_KEY="你的API Key"' >> ~/.zshrc
+echo 'export MIMO_TP_API_KEY="你的API Key"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -243,12 +243,12 @@ TUI 启动时也会自动检查新版本（每 20 小时一次），有新版本
 完整配置示例：
 
 ```toml
-model_provider = "mimo"
+model_provider = "mimo-tp"
 
-[model_providers.mimo]
-name = "XiaomiMimo"
-base_url = "https://api.xiaomimimo.com/v1"
-env_key = "MIMO_API_KEY"
+[model_providers.mimo-tp]
+name = "XiaomiMimoTokenPlan"
+base_url = "https://token-plan-cn.xiaomimimo.com/v1"
+env_key = "MIMO_TP_API_KEY"
 wire_api = "chat"
 ```
 
@@ -265,7 +265,7 @@ model_catalog_json = "/home/用户名/.codex/custom_models.json"
 
 - [**国内服务商配置指南**](codex-rs/CHINA_PROVIDER.md)
 
-支持的服务商：火山引擎/豆包、Kimi Code、DeepSeek、小米 Mimo，以及任何兼容 OpenAI Chat Completions API 的国内平台。
+支持的服务商：小米 Mimo（TokenPlan / API）、DeepSeek、Kimi Code、火山引擎/豆包，以及任何兼容 OpenAI Chat Completions API 的国内平台。
 
 ## 文档
 
