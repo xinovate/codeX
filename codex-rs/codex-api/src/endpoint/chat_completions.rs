@@ -135,6 +135,7 @@ fn spawn_chat_completions_stream(
         let mut event_stream = stream.eventsource();
         let mut response_id: Option<String> = None;
         let mut accumulated_text = String::new();
+        let mut accumulated_reasoning = String::new();
         let mut message_item_added = false;
         let mut _last_model: Option<String> = None;
 
@@ -245,6 +246,7 @@ fn spawn_chat_completions_stream(
                     if let Some(reasoning) = delta.get("reasoning_content").and_then(|v| v.as_str())
                     {
                         if !reasoning.is_empty() {
+                            accumulated_reasoning.push_str(reasoning);
                             // Ensure message item is added before reasoning delta
                             if !message_item_added {
                                 let _ = tx_event
@@ -350,6 +352,23 @@ fn spawn_chat_completions_stream(
                     };
 
                     if finish_reason == "tool_calls" {
+                        // Emit reasoning item before tool calls if we accumulated any
+                        if !accumulated_reasoning.is_empty() {
+                            let _ = tx_event
+                                .send(Ok(ResponseEvent::OutputItemDone(
+                                    codex_protocol::models::ResponseItem::Reasoning {
+                                        id: String::new(),
+                                        summary: vec![],
+                                        content: Some(vec![
+                                            codex_protocol::models::ReasoningItemContent::ReasoningText {
+                                                text: accumulated_reasoning.clone(),
+                                            },
+                                        ]),
+                                        encrypted_content: None,
+                                    },
+                                )))
+                                .await;
+                        }
                         // For tool call responses: close any open message first,
                         // then emit OutputItemDone(FunctionCall) for each tool call.
 
@@ -426,6 +445,23 @@ fn spawn_chat_completions_stream(
                             }
                         }
                     } else {
+                        // Emit reasoning item before message if we accumulated any
+                        if !accumulated_reasoning.is_empty() {
+                            let _ = tx_event
+                                .send(Ok(ResponseEvent::OutputItemDone(
+                                    codex_protocol::models::ResponseItem::Reasoning {
+                                        id: String::new(),
+                                        summary: vec![],
+                                        content: Some(vec![
+                                            codex_protocol::models::ReasoningItemContent::ReasoningText {
+                                                text: accumulated_reasoning.clone(),
+                                            },
+                                        ]),
+                                        encrypted_content: None,
+                                    },
+                                )))
+                                .await;
+                        }
                         // Emit output_item.done for regular message
                         if !message_item_added {
                             // If we never sent OutputItemAdded(Message), send it now
@@ -595,6 +631,11 @@ fn convert_request_body(responses_body: &mut Value) {
                             }
                         }]),
                     );
+                    // Attach accumulated reasoning content to this assistant message.
+                    // DeepSeek requires reasoning_content to be passed back.
+                    if let Some(reasoning) = pending_reasoning_content.take() {
+                        obj.insert("reasoning_content".to_string(), Value::String(reasoning));
+                    }
                     continue;
                 }
                 if msg_type == Some("function_call_output") {
@@ -813,17 +854,24 @@ fn convert_request_body(responses_body: &mut Value) {
     obj.remove("client_metadata");
 
     // 5b. Convert Responses API `reasoning` → Chat Completions `thinking`.
-    //     reasoning.effort: "none" → thinking disabled, otherwise → enabled.
-    let reasoning_effort = obj
-        .remove("reasoning")
-        .and_then(|r| r.get("effort").cloned())
-        .and_then(|e| e.as_str().map(String::from));
-    match reasoning_effort.as_deref() {
-        Some("none") | None => {
+    //     - "none" → explicit disabled
+    //     - absent → don't send thinking (provider uses its default, e.g. DeepSeek has it on)
+    //     - other values ("low","medium","high"...) → enabled
+    let reasoning = obj.remove("reasoning");
+    let reasoning_effort = reasoning
+        .as_ref()
+        .and_then(|r| r.get("effort"))
+        .and_then(|e| e.as_str());
+    match reasoning_effort {
+        Some("none") => {
             chat_obj.insert("thinking".to_string(), json!({"type": "disabled"}));
         }
-        _ => {
+        Some(_) => {
             chat_obj.insert("thinking".to_string(), json!({"type": "enabled"}));
+        }
+        None => {
+            // No reasoning field or no effort — leave thinking unset,
+            // provider uses its own default (e.g. DeepSeek thinking is on).
         }
     }
 
