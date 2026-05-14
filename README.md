@@ -2,7 +2,27 @@
 
 > **与小米 Mimo 联合共建** - 小米大模型 core 团队为本项目提供 API 资源，共同推进国内 AI 编程工具生态
 
-基于 OpenAI Codex CLI 的 fork（基于 commit `8a97f3cf03`，2026-04-30），内置支持国内大模型服务商（小米 Mimo、DeepSeek、Kimi Code、火山引擎/豆包 等），通过 OpenAI Chat Completions API 接入。
+基于 OpenAI Codex CLI 的 fork，让国内大模型服务商（小米 Mimo、DeepSeek、Kimi Code、火山引擎/豆包 等）可以直接接入 Codex，开箱即用。
+
+## 为什么需要这个项目？
+
+OpenAI Codex CLI 上游在 2026 年初删除了 `wire_api = "chat"`（Chat Completions API）支持，**要求所有 provider 必须实现 OpenAI Responses API**（`/v1/responses`）。
+
+然而国内大模型（DeepSeek、智谱 GLM、Kimi、小米 Mimo 等）普遍只提供 **OpenAI Chat Completions API**（`/v1/chat/completions`），不支持 Responses API。
+
+这意味着：
+- 上游 Codex CLI **无法直接使用**任何国产大模型
+- 即使通过 `config.toml` 配置自定义 provider，`wire_api = "chat"` 也会直接报错
+- 社区的替代方案（One-API 代理、Bifrost 网关等）只是协议转发，无法解决 Codex 对 Responses API 特有功能（structured outputs、tool calls 并行、multi-turn context）的依赖
+
+**本项目的核心价值：**
+
+1. **协议转换层** — 完整实现 Responses API → Chat Completions 双向转换，透明处理 tool calls、reasoning content、multi-turn 上下文等差异
+2. **预编译分发** — GitHub Releases 提供开箱即用的预编译二进制（Linux/Windows/macOS），无需安装 Rust 或 Node.js
+3. **自更新机制** — `codex update` 一键升级，自动检测平台下载最新版本
+4. **中文文档** — 面向国内开发者的完整安装和配置指南
+
+**简单来说：上游关了门，我们建了桥。**
 
 ## 安装
 
@@ -265,7 +285,7 @@ model_catalog_json = "/home/用户名/.codex/custom_models.json"
 
 - [**国内服务商配置指南**](codex-rs/CHINA_PROVIDER.md)
 
-支持的服务商：小米 Mimo（TokenPlan / API）、DeepSeek、Kimi Code、火山引擎/豆包，以及任何兼容 OpenAI Chat Completions API 的国内平台。
+支持的服务商：小米 Mimo（TokenPlan / API）、DeepSeek、Kimi Code、火山引擎/豆包、智谱 GLM，以及任何兼容 OpenAI Chat Completions API 的国内平台。
 
 ## 文档
 

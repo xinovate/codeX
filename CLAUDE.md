@@ -11,12 +11,16 @@ This is a fork of OpenAI's Codex CLI with China provider support.
 
 ## How to sync with upstream
 
+> **注意：当前不建议主动同步上游。** 上游已删除 `wire_api = "chat"` 支持，合并会产生大量冲突。
+> 除非上游有明确需要的功能（如新的 sandbox 能力），否则保持现状。详见下方 "Upstream Divergence" 章节。
+
 ```bash
 git fetch upstream
 git checkout main
 git merge upstream/main
 git checkout custom_provider
-git merge main
+# 优先 cherry-pick 具体 commit，而非 merge 整个分支
+git cherry-pick <commit-hash>
 ```
 
 Resolve conflicts if any, then push both branches.
@@ -77,12 +81,45 @@ GitHub Actions 自动构建以下平台：
 | Volcengine | https://ark.cn-beijing.volces.com/api/coding/v3 | VOLCENGINE_API_KEY |
 | Kimi Code | https://api.kimi.com/coding/v1 | KIMI_CODE_API_KEY |
 | Xiaomi Mimo | https://api.xiaomimimo.com/v1 | MIMO_API_KEY |
+| 智谱 GLM | https://open.bigmodel.cn/api/coding/paas/v4 | ZHIPU_API_KEY |
 
 ## CI
 
 - `cargo-deny`, `Codespell`, `ci` (Prettier + ASCII check) - Run on all pushes
 - `rust-ci-full`, `sdk`, `Bazel` - Upstream CI, may fail on fork (missing runners/secrets), ignore these
 - `release` - Triggered by `v*.*.*` tags from `custom_provider` branch only (has `if: github.event.base_ref == 'refs/heads/custom_provider'` guard), builds release binaries for Linux/Windows/macOS
+
+## Upstream Divergence (Updated 2026-05-14)
+
+**结论：不要主动合并上游，fork 已是独立项目。**
+
+上游在 `#10157`（2026-02-03）彻底删除了 Chat Completions 支持（-2931 行），`WireApi` enum 只剩 `Responses` 变体。
+所有 provider 现在必须实现 `/v1/responses` 端点，而国产模型（DeepSeek、GLM 等）只提供 `/v1/chat/completions`。
+
+本 fork 的核心价值是 **Responses API → Chat Completions 协议转换层**（`chat_completions.rs` + `ChatCompletionsClient`），
+这是国产模型接入 Codex 的唯一桥梁。
+
+| 能力 | 上游 main | 本 fork |
+|------|-----------|---------|
+| `wire_api = "chat"` | 已删除，报错提示改用 responses | 保留并适配 |
+| `ChatCompletionsClient` | 不存在 | 完整实现 |
+| 国产模型直接配置使用 | 不可能 | DeepSeek/Volcengine/Kimi/Mimo |
+| 预编译二进制分发 | 无（npm 源码安装） | GitHub Releases 多平台 |
+| `codex update` 自更新 | 无 | 有 |
+
+### Merge 策略
+
+- **不要定期 sync upstream** — 方向已分叉，合并只会带来冲突
+- **如需某个上游功能** — cherry-pick 具体 commit，不要 merge 整个分支
+- **关注风险** — 上游如果大幅改动 Responses API 请求/响应格式，协议转换层可能需要同步调整
+- **main 分支** — 仍然跟踪 upstream，但不主动拉取。仅在确实需要 sync 时操作
+
+### 上游关键时间线
+
+- `2025-05-08` 首次加入 Chat Completions 支持（`#862`）
+- `2025-08-05` 完善 streaming chat completions（`#1846`）
+- `2026-02-03` **删除 Chat Completions API**（`#10157`），上游要求所有 provider 走 Responses API
+- `2026-04-30` 本 fork 的 main 分支所基于的 upstream commit（`8a97f3cf`）
 
 ## Upstream Remote
 

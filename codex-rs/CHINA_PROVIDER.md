@@ -11,6 +11,7 @@
 | DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` | ✅ 多轮/工具/分析 全部通过 |
 | Kimi Code | `kimi-k2.6` | ✅ 多轮/工具/分析 全部通过 |
 | 火山引擎 (Volcengine) | `doubao-seed-2.0-code` | ✅ 多轮/工具/分析 全部通过 |
+| 智谱 GLM | `glm-5.1`、`glm-4.7-flash` | ✅ 多轮/工具/分析 全部通过 |
 
 ---
 
@@ -218,6 +219,25 @@ wire_api = "chat"
 
 > **注意**：火山引擎 Coding Plan 使用 `/api/coding/v3`（OpenAI 兼容），不要用 `/api/v3`（会产生额外费用）。
 
+### 智谱 GLM
+
+```toml
+model = "glm-5.1"
+model_provider = "zhipu"
+
+[model_providers.zhipu]
+name = "ZhiPuGLM"
+base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
+env_key = "ZHIPU_API_KEY"
+wire_api = "chat"
+```
+
+环境变量：`export ZHIPU_API_KEY="你的API Key"`
+
+可用模型：`glm-5.1`（旗舰）、`glm-4.7-flash`（快速）、`glm-z1`（思考）、`glm-z1-air`（轻量思考）。
+
+> **注意**：智谱 Coding Plan 必须使用专属端点 `api/coding/paas/v4`，通用端点 `api/paas/v4` 不适用。`reasoning_content` 和 `thinking.type` 参数与 DeepSeek 格式一致。
+
 ### 添加其他 Provider
 
 任何兼容 OpenAI Chat Completions API 的国内平台都可以接入，格式如下：
@@ -237,7 +257,7 @@ wire_api = "chat"
 
 ## 模型元数据配置（可选）
 
-已知的国内模型（`deepseek-*`、`doubao-*`、`kimi-*`、`mimo*` 等）会自动识别，无需额外配置。
+已知的国内模型（`deepseek-*`、`doubao-*`、`kimi-*`、`glm-*`、`mimo*` 等）会自动识别，无需额外配置。
 
 如果使用非标准命名的模型，可以手动创建 `~/.codex/custom_models.json`（Windows: `%USERPROFILE%\.codex\custom_models.json`）来提供元数据：
 
@@ -313,6 +333,7 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 | DeepSeek | `deepseek-v4-pro` | 支持但默认禁用 | `deepseek-v4-flash` 默认开启思考，Codex 自动禁用 |
 | Kimi Code | `kimi-k2` | 支持但默认禁用 | 同 DeepSeek 格式 |
 | 火山引擎/豆包 | `doubao-1.5-thinking-pro` | 支持但默认禁用 | 同 DeepSeek 格式 |
+| 智谱 GLM | `glm-z1`、`glm-z1-air` | 支持但默认禁用 | 同 DeepSeek 格式，使用 `thinking.type` 参数 |
 
 > **注意**：如果需要使用思考模式，需要修改代码中的 `thinking: {type: "disabled"}` 为 `"enabled"`，并确保正确处理 `reasoning_content` 的回传。
 
