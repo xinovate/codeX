@@ -1,17 +1,27 @@
 # Codex CLI - China Provider
 
-支持国内大模型的 Codex CLI（小米 Mimo、DeepSeek、Kimi Code、火山引擎/豆包 等），通过 Chat Completions API 接入。
+> **与小米 Mimo 联合共建** - 小米大模型 core 团队为本项目提供 API 资源，共同推进国内 AI 编程工具生态
 
-**已验证的服务商：**
+## 为什么需要这个项目？
 
-| 服务商 | 模型示例 | 状态 |
-|--------|---------|------|
-| Xiaomi Mimo (TokenPlan) | `mimo-v2.5-pro` | ✅ 多轮/工具/分析 全部通过 |
-| Xiaomi Mimo (API) | `mimo-v2.5-pro` | ✅ 多轮/工具/分析 全部通过 |
-| DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` | ✅ 多轮/工具/分析 全部通过 |
-| Kimi Code | `kimi-k2.6` | ✅ 多轮/工具/分析 全部通过 |
-| 火山引擎 (Volcengine) | `doubao-seed-2.0-code` | ✅ 多轮/工具/分析 全部通过 |
-| 智谱 GLM | `glm-5.1`、`glm-4.7-flash` | ✅ 多轮/工具/分析 全部通过 |
+OpenAI Codex CLI 上游在 2026 年初删除了 `wire_api = "chat"`（Chat Completions API）支持，**要求所有 provider 必须实现 OpenAI Responses API**（`/v1/responses`）。
+
+然而国内大模型（DeepSeek、智谱 GLM、Kimi、小米 Mimo 等）普遍只提供 **OpenAI Chat Completions API**（`/v1/chat/completions`），不支持 Responses API。这意味着上游 Codex CLI **无法直接使用**任何国产大模型。
+
+本项目实现了 **Responses API → Chat Completions 协议转换层**，并提供预编译二进制和自更新机制，让国产模型开箱即用。
+
+---
+
+## 已验证的服务商
+
+| 服务商 | 模型示例 | 接入方式 | 状态 |
+|--------|---------|---------|------|
+| 小米 Mimo (TokenPlan) | `mimo-v2.5-pro` | 套餐模式 | ✅ 多轮/工具/分析 全部通过 |
+| 小米 Mimo (API) | `mimo-v2.5-pro` | 按量计费 | ✅ 多轮/工具/分析 全部通过 |
+| DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` | API Key | ✅ 多轮/工具/分析 全部通过 |
+| 智谱 GLM | `glm-5.1`、`glm-4.7-flash` | Coding Plan | ✅ 多轮/工具/分析 全部通过 |
+| Kimi Code | `kimi-k2.6` | 订阅制 | ✅ 多轮/工具/分析 全部通过 |
+| 火山引擎/豆包 | `doubao-seed-2.0-code` | Coding Plan | ✅ 多轮/工具/分析 全部通过 |
 
 ---
 
@@ -64,16 +74,16 @@ codex --version
 
 创建配置文件（Linux/macOS: `~/.codex/config.toml`，Windows: `%USERPROFILE%\.codex\config.toml`）。
 
-以小米 Mimo 为例，完整配置如下：
+以智谱 GLM 为例，完整配置如下：
 
 ```toml
-model = "mimo-model-name"
-model_provider = "mimo"
+model = "glm-4.7-flash"
+model_provider = "zhipu"
 
-[model_providers.mimo]
-name = "XiaomiMimo"
-base_url = "https://api.xiaomimimo.com/v1"
-env_key = "MIMO_API_KEY"
+[model_providers.zhipu]
+name = "ZhiPuGLM"
+base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
+env_key = "ZHIPU_API_KEY"
 wire_api = "chat"
 ```
 
@@ -81,10 +91,10 @@ wire_api = "chat"
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `model` | 是 | 模型名称，如 `"mimo-model-name"`、`"doubao-pro-32k"` |
+| `model` | 是 | 模型名称，如 `"glm-4.7-flash"`、`"deepseek-v4-flash"` |
 | `model_provider` | 是 | Provider 标识，对应 `[model_providers.xxx]` 中的 `xxx` |
 | `name` | 是 | Provider 显示名称 |
-| `base_url` | 是 | API 地址，如 `https://api.xiaomimimo.com/v1`、`https://api.deepseek.com` |
+| `base_url` | 是 | API 地址，如 `https://open.bigmodel.cn/api/coding/paas/v4` |
 | `env_key` | 是 | API Key 对应的环境变量名 |
 | `wire_api` | 是 | 固定填 `"chat"`（小写），国内 provider 必须设置 |
 
@@ -94,16 +104,16 @@ wire_api = "chat"
 
 ```bash
 # Linux / macOS（当前会话）
-export MIMO_API_KEY="sk-xxxxxxxx"
+export ZHIPU_API_KEY="你的API Key"
 
 # Windows PowerShell（当前会话）
-$env:MIMO_API_KEY = "sk-xxxxxxxx"
+$env:ZHIPU_API_KEY = "你的API Key"
 ```
 
 **永久生效：**
 
-- **bash**：`echo 'export MIMO_API_KEY="sk-xxxxxxxx"' >> ~/.bashrc`
-- **zsh**（macOS 默认）：`echo 'export MIMO_API_KEY="sk-xxxxxxxx"' >> ~/.zshrc`
+- **bash**：`echo 'export ZHIPU_API_KEY="你的API Key"' >> ~/.bashrc`
+- **zsh**（macOS 默认）：`echo 'export ZHIPU_API_KEY="你的API Key"' >> ~/.zshrc`
 - **Windows**：通过系统设置 → 环境变量添加用户变量
 
 ### 5. 使用
