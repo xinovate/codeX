@@ -121,6 +121,18 @@ GitHub Actions 自动构建以下平台：
 - `2026-02-03` **删除 Chat Completions API**（`#10157`），上游要求所有 provider 走 Responses API
 - `2026-04-30` 本 fork 的 main 分支所基于的 upstream commit（`8a97f3cf`）
 
+## Build Rules
+
+- **编译命令**：`cargo build --bin codex --manifest-path codex-rs/Cargo.toml`
+- **开发迭代**：始终使用 debug 模式（不加 `--release`）
+  - 增量编译 ~3 分钟（只重编改动的 crate）
+  - Clean build（全量编译）约 40-50 分钟，**绝对不要清缓存**
+  - Debug 二进制 ~500MB，Release ~175MB
+  - debug 二进制路径：`codex-rs/target/debug/codex`（已在 PATH 中）
+- **仅发布时** 使用 `cargo build --release --bin codex --manifest-path codex-rs/Cargo.toml`
+- **禁止** `cargo clean`（会删除全部增量编译缓存，恢复需要 40+ 分钟）
+- 可安全删除 `codex-rs/target/release/` 释放空间（~12GB），但不要动 `target/debug/`
+
 ## Upstream Remote
 
 ```bash

@@ -217,3 +217,60 @@ These guidelines apply to app-server protocol work in `codex-rs`, especially:
 - Validate with `cargo test -p codex-app-server-protocol`.
 - Avoid boilerplate tests that only assert experimental field markers for individual
   request fields in `common.rs`; rely on schema generation/tests and behavioral coverage instead.
+
+---
+
+# Fork-specific: xinovate/codex (China Provider)
+
+## Branch Structure
+
+- **main** - Tracks upstream OpenAI codex. DO NOT modify with custom code.
+- **custom_provider** - Development branch with China provider support.
+
+## Key Files Modified from Upstream
+
+- `codex-rs/Cargo.toml` - Workspace version (line 112, affects `codex --version`)
+- `codex-rs/codex-api/src/endpoint/chat_completions.rs` - Chat Completions API conversion
+- `codex-rs/model-provider/src/china_provider/mod.rs` - China provider runtime
+- `codex-rs/model-provider-info/src/lib.rs` - China provider detection, WireApi::Chat variant
+- `codex-rs/core/src/client.rs` - ChatCompletionsClient integration
+- `codex-rs/tui/src/updates.rs` - Update check URL (points to xinovate/codex GitHub releases)
+- `codex-rs/tui/src/update_versions.rs` - Tag prefix parsing (uses `v*` instead of `rust-v*`)
+- `codex-rs/tui/src/update_action.rs` - Standalone update points to our releases page
+- `codex-rs/cli/src/main.rs` - `codex update` command: auto-downloads from GitHub releases
+- `codex-rs/tui/tooltips.txt` - Removed OpenAI-specific tips
+- `.github/workflows/release.yml` - Added macOS build targets, restricted to custom_provider branch
+- `README.md` - Installation docs for China providers (Chinese)
+- `codex-rs/CHINA_PROVIDER.md` - China provider setup guide (Chinese)
+
+## Supported China Providers
+
+| Provider | Base URL | Env Key |
+|----------|----------|---------|
+| DeepSeek | https://api.deepseek.com | DEEPSEEK_API_KEY |
+| Volcengine | https://ark.cn-beijing.volces.com/api/coding/v3 | VOLCENGINE_API_KEY |
+| Kimi Code | https://api.kimi.com/coding/v1 | KIMI_CODE_API_KEY |
+| Xiaomi Mimo | https://api.xiaomimimo.com/v1 | MIMO_API_KEY |
+| ZhiPu GLM | https://open.bigmodel.cn/api/coding/paas/v4 | ZHIPU_API_KEY |
+
+## Build Rules
+
+- **Development**: Always use `cargo build --bin codex` (debug mode)
+  - Debug build ~3 min, Release ~40 min
+  - Debug binary ~500MB, Release ~175MB
+  - Debug binary: `target/debug/codex`
+- **Release only** for publishing: `cargo build --release --bin codex`
+- Install command: `cp codex-rs/target/debug/codex /usr/local/bin/codex`
+
+## Release Process
+
+1. Bump version in `codex-rs/Cargo.toml` line 112
+2. `git commit -m "bump version to x.y.z"`
+3. `git tag vx.y.z && git push origin custom_provider && git push origin vx.y.z`
+4. GitHub Actions builds for Linux/Windows/macOS
+
+## Upstream Divergence
+
+Do NOT merge upstream — the fork is an independent project. Upstream deleted Chat Completions
+support (`#10157`). This fork's core value is the Responses API → Chat Completions protocol
+conversion layer. Cherry-pick specific commits if needed, never merge the whole branch.

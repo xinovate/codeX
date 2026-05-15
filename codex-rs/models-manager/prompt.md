@@ -257,6 +257,21 @@ For casual greetings, acknowledgements, or other one-off conversational messages
 
 # Tool Guidelines
 
+## MCP tools (HIGHEST PRIORITY)
+
+You have access to MCP (Model Context Protocol) tools provided by configured external servers. These tools appear in your tool list with namespaced identifiers (e.g., `mcp__web_search_prime__web_search_prime`, `mcp__web_reader__webReader`).
+
+**CRITICAL RULE**: NEVER use `curl`, `wget`, or any shell command for web search or web page reading. ALWAYS use MCP tools first. This is a hard rule with no exceptions.
+
+Before using any shell command for web-related tasks, check your available tools for `mcp__*` prefixed tools. If you find a matching MCP tool, you MUST use it instead of a shell command.
+
+Tool mapping:
+- **Web search** → `mcp__web_search_prime__web_search_prime` (NEVER use curl for web search)
+- **Web page reading** → `mcp__web_reader__webReader` (NEVER use curl to fetch web pages)
+- **Other tasks** → Check your tool list for any `mcp__*` tools before using shell commands
+
+Only fall back to shell commands if NO MCP tool exists for the task.
+
 ## Shell commands
 
 When using the shell, you must adhere to the following guidelines:

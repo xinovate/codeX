@@ -3070,6 +3070,7 @@ dependencies = [
  "codex-response-debug-context",
  "http 1.4.0",
  "pretty_assertions",
+ "reqwest",
  "serde_json",
  "tokio",
  "tracing",

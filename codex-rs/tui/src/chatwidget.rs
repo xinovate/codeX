@@ -2707,13 +2707,31 @@ impl ChatWidget {
             return;
         }
 
-        if let Some(header) = extract_first_bold(&self.reasoning_buffer) {
-            // Update the shimmer header to the extracted reasoning chunk header.
-            self.terminal_title_status_kind = TerminalTitleStatusKind::Thinking;
-            self.set_status_header(header);
-        } else {
-            // Fallback while we don't yet have a bold header: leave existing header as-is.
-        }
+        // Determine header: use bold text if found, otherwise "Thinking"
+        let header = extract_first_bold(&self.reasoning_buffer)
+            .unwrap_or_else(|| String::from("Thinking"));
+        self.terminal_title_status_kind = TerminalTitleStatusKind::Thinking;
+
+        // Show a preview of the current thinking content in status details.
+        let details = {
+            let buf = self.reasoning_buffer.trim();
+            if buf.len() > 1200 {
+                let mut start = buf.len() - 1000;
+                // Ensure we don't slice inside a multi-byte UTF-8 character
+                while !buf.is_char_boundary(start) {
+                    start += 1;
+                }
+                format!("...{}", &buf[start..])
+            } else {
+                buf.to_string()
+            }
+        };
+        self.set_status(
+            header,
+            Some(details),
+            StatusDetailsCapitalization::Preserve,
+            /*details_max_lines*/ 12,
+        );
         self.request_redraw();
     }
 
@@ -8163,7 +8181,7 @@ impl ChatWidget {
             Some(ReasoningEffortConfig::Medium) => "medium",
             Some(ReasoningEffortConfig::High) => "high",
             Some(ReasoningEffortConfig::XHigh) => "xhigh",
-            None | Some(ReasoningEffortConfig::None) => "default",
+            None | Some(ReasoningEffortConfig::None) => "",
         }
     }
 
@@ -8888,7 +8906,7 @@ impl ChatWidget {
             let description =
                 (!preset.description.is_empty()).then_some(preset.description.to_string());
             let is_current = preset.model.as_str() == self.current_model();
-            let single_supported_effort = preset.supported_reasoning_efforts.len() == 1;
+            let single_supported_effort = preset.supported_reasoning_efforts.len() <= 1;
             let preset_for_action = preset.clone();
             let actions: Vec<SelectionAction> = vec![Box::new(move |tx| {
                 let preset_for_event = preset_for_action.clone();

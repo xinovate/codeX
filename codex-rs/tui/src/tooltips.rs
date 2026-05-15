@@ -14,6 +14,8 @@ const OTHER_TOOLTIP: &str = "";
 const OTHER_TOOLTIP_NON_MAC: &str = "";
 const FREE_GO_TOOLTIP: &str =
     "*New* For a limited time, Codex is included in your plan for free – let’s build together.";
+const CHINA_PROVIDER_PROMO: &str =
+    "Made in China | DeepSeek / GLM / Kimi / Mimo / 豆包 开箱即用 | github.com/xinovate/codex";
 
 const RAW_TOOLTIPS: &str = include_str!("../tooltips.txt");
 
@@ -72,12 +74,11 @@ pub(crate) fn get_tooltip(plan: Option<PlanType>, fast_mode_enabled: bool) -> Op
                 return Some(FREE_GO_TOOLTIP.to_string());
             }
             _ => {
-                let tooltip = if IS_MACOS {
-                    OTHER_TOOLTIP
-                } else {
-                    OTHER_TOOLTIP_NON_MAC
-                };
-                return Some(tooltip.to_string());
+                // Custom provider users (no OpenAI plan): 20% promo, 80% random tips
+                if rng.random_bool(0.2) {
+                    return Some(CHINA_PROVIDER_PROMO.to_string());
+                }
+                // Fall through to random tip pool below
             }
         }
     }

@@ -150,6 +150,14 @@ impl StreamableHttpClient for StreamableHttpClientAdapter {
 
         let content_type = response_header(&response.headers, CONTENT_TYPE);
         let session_id = response_header(&response.headers, HEADER_SESSION_ID);
+
+        // Some MCP servers (e.g., Chinese providers like Zhipu/BigModel)
+        // return HTTP 200 with empty body for notifications instead of the
+        // spec-compliant HTTP 202 Accepted. Treat 200 + missing/empty
+        // content-type as "accepted" so the handshake can complete.
+        if response.status == StatusCode::OK.as_u16() && content_type.is_none() {
+            return Ok(StreamableHttpPostResponse::Accepted);
+        }
         match content_type.as_deref() {
             Some(content_type) if content_type.starts_with(EVENT_STREAM_MIME_TYPE) => {
                 let event_stream = sse_stream_from_body(body_stream);

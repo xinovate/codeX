@@ -582,7 +582,7 @@ impl HistoryCell for UpdateAvailableHistoryCell {
         } else {
             line![
                 "See ",
-                "https://github.com/openai/codex".cyan().underlined(),
+                "https://github.com/xinovate/codex".cyan().underlined(),
                 " for installation options."
             ]
         };
@@ -597,7 +597,7 @@ impl HistoryCell for UpdateAvailableHistoryCell {
             update_instruction,
             "",
             "See full release notes:",
-            "https://github.com/openai/codex/releases/latest"
+            "https://github.com/xinovate/codex/releases/latest"
                 .cyan()
                 .underlined(),
         ];
@@ -1428,13 +1428,13 @@ impl SessionHeaderHistoryCell {
     }
 
     fn reasoning_label(&self) -> Option<&'static str> {
-        self.reasoning_effort.map(|effort| match effort {
-            ReasoningEffortConfig::Minimal => "minimal",
-            ReasoningEffortConfig::Low => "low",
-            ReasoningEffortConfig::Medium => "medium",
-            ReasoningEffortConfig::High => "high",
-            ReasoningEffortConfig::XHigh => "xhigh",
-            ReasoningEffortConfig::None => "none",
+        self.reasoning_effort.and_then(|effort| match effort {
+            ReasoningEffortConfig::Minimal => Some("minimal"),
+            ReasoningEffortConfig::Low => Some("low"),
+            ReasoningEffortConfig::Medium => Some("medium"),
+            ReasoningEffortConfig::High => Some("high"),
+            ReasoningEffortConfig::XHigh => Some("xhigh"),
+            ReasoningEffortConfig::None => None,
         })
     }
 }
@@ -1450,7 +1450,7 @@ impl HistoryCell for SessionHeaderHistoryCell {
         // Title line rendered inside the box: ">_ OpenAI Codex (vX)"
         let title_spans: Vec<Span<'static>> = vec![
             Span::from(">_ ").dim(),
-            Span::from("OpenAI Codex").bold(),
+            Span::from("Codex (xinovate)").bold(),
             Span::from(" ").dim(),
             Span::from(format!("(v{})", self.version)).dim(),
         ];

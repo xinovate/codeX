@@ -11,6 +11,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use codex_api::Provider;
 use codex_api::SharedAuthProvider;
@@ -19,13 +20,111 @@ use codex_login::CodexAuth;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::manager::StaticModelsManager;
-use codex_protocol::error::Result;
+use codex_models_manager::model_info;
+use codex_protocol::openai_models::ModelInfo;
+use codex_protocol::openai_models::ModelVisibility;
 use codex_protocol::openai_models::ModelsResponse;
+use tracing::warn;
 
 use crate::bearer_auth_provider::BearerAuthProvider;
 use crate::provider::ModelProvider;
 use crate::provider::ProviderAccountResult;
 use crate::provider::ProviderAccountState;
+
+const MODELS_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Fetch model IDs from the provider's `/models` endpoint (blocking).
+/// Runs in a dedicated thread to avoid nested tokio runtime panic.
+fn fetch_provider_models(info: &ModelProviderInfo) -> Vec<ModelInfo> {
+    let info = info.clone();
+    std::thread::spawn(move || fetch_provider_models_blocking(&info))
+        .join()
+        .unwrap_or_default()
+}
+
+fn fetch_provider_models_blocking(info: &ModelProviderInfo) -> Vec<ModelInfo> {
+    let Some(base_url) = info.base_url.as_deref() else {
+        return Vec::new();
+    };
+
+    let url = format!("{base_url}/models");
+    let token = info
+        .api_key()
+        .ok()
+        .flatten()
+        .or_else(|| info.experimental_bearer_token.clone());
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(MODELS_REQUEST_TIMEOUT)
+        .build();
+
+    let Ok(client) = client else {
+        return Vec::new();
+    };
+
+    let mut req = client
+        .get(&url)
+        .header("User-Agent", "codex-cli/0.1");
+
+    if let Some(token) = token {
+        req = req.bearer_auth(&token);
+    }
+
+    let resp = match req.send() {
+        Ok(resp) => resp,
+        Err(e) => {
+            warn!("china provider /models request failed: {e}");
+            return Vec::new();
+        }
+    };
+
+    if !resp.status().is_success() {
+        warn!("china provider /models returned {}", resp.status());
+        return Vec::new();
+    }
+
+    let body = match resp.text() {
+        Ok(body) => body,
+        Err(e) => {
+            warn!("china provider /models read body failed: {e}");
+            return Vec::new();
+        }
+    };
+
+    // Parse OpenAI-compatible {"data": [{"id": "..."}]} format
+    let val: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(e) => {
+            warn!("china provider /models parse failed: {e}");
+            return Vec::new();
+        }
+    };
+
+    let Some(data) = val.get("data").and_then(|d| d.as_array()) else {
+        return Vec::new();
+    };
+
+    let mut models: Vec<ModelInfo> = data
+        .iter()
+        .rev() // Provider returns ascending (oldest first); reverse so newest is first
+        .filter_map(|entry| {
+            let id = entry.get("id")?.as_str()?.to_string();
+            let mut model = model_info::model_info_from_slug(&id);
+            model.visibility = ModelVisibility::List;
+            model.display_name = id.clone();
+            model.slug = id;
+            Some(model)
+        })
+        .collect();
+
+    // Assign priorities: priority 0 = highest (listed first).
+    // After .rev(), models[0] is the newest model, so it gets priority 0.
+    for (i, model) in models.iter_mut().enumerate() {
+        model.priority = i as i32;
+    }
+
+    models
+}
 
 /// Runtime provider for Chinese platform Chat API endpoints.
 ///
@@ -57,7 +156,7 @@ impl ModelProvider for ChinaModelProvider {
         })
     }
 
-    async fn api_provider(&self) -> Result<Provider> {
+    async fn api_provider(&self) -> codex_protocol::error::Result<Provider> {
         // Use the configured base_url directly.
         // The ChatCompletionsClient will append /chat/completions.
         let mut provider = self.info.to_api_provider(None)?;
@@ -73,7 +172,7 @@ impl ModelProvider for ChinaModelProvider {
         Ok(provider)
     }
 
-    async fn api_auth(&self) -> Result<SharedAuthProvider> {
+    async fn api_auth(&self) -> codex_protocol::error::Result<SharedAuthProvider> {
         // Resolve the API key from env_key or experimental_bearer_token
         let token = self.info.api_key().ok().flatten();
         // Also check experimental_bearer_token as fallback
@@ -88,12 +187,13 @@ impl ModelProvider for ChinaModelProvider {
     fn models_manager(
         &self,
         _codex_home: PathBuf,
-        config_model_catalog: Option<ModelsResponse>,
+        _config_model_catalog: Option<ModelsResponse>,
     ) -> SharedModelsManager {
-        // China providers always use static models manager since
-        // the /models endpoint may not be available.
-        let model_catalog =
-            config_model_catalog.unwrap_or_else(|| ModelsResponse { models: vec![] });
-        Arc::new(StaticModelsManager::new(None, model_catalog))
+        let models = fetch_provider_models(&self.info);
+        if models.is_empty() {
+            warn!("china provider /models returned empty list, /model picker will be unavailable");
+        }
+        let catalog = ModelsResponse { models };
+        Arc::new(StaticModelsManager::new(None, catalog))
     }
 }

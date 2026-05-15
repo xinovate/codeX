@@ -242,7 +242,9 @@ fn spawn_chat_completions_stream(
                         }
                     }
 
-                    // Reasoning content → reasoning_text.delta (Volcengine-specific)
+                    // Reasoning content → use ReasoningSummaryDelta so TUI always displays it.
+                    // ReasoningContentDelta is gated behind show_raw_agent_reasoning which
+                    // defaults to false, causing reasoning to be silently dropped.
                     if let Some(reasoning) = delta.get("reasoning_content").and_then(|v| v.as_str())
                     {
                         if !reasoning.is_empty() {
@@ -262,9 +264,9 @@ fn spawn_chat_completions_stream(
                                 message_item_added = true;
                             }
                             let _ = tx_event
-                                .send(Ok(ResponseEvent::ReasoningContentDelta {
+                                .send(Ok(ResponseEvent::ReasoningSummaryDelta {
                                     delta: reasoning.to_string(),
-                                    content_index: 0,
+                                    summary_index: 0,
                                 }))
                                 .await;
                         }
@@ -560,6 +562,14 @@ fn convert_content_types(content: &mut Value) {
                         }
                         Some("input_image") => {
                             *t = Value::String("image_url".to_string());
+                            // Responses API: "image_url": "https://..." (string)
+                            // Chat Completions API: "image_url": {"url": "https://..."} (object)
+                            if let Some(url_val) = obj.remove("image_url") {
+                                obj.insert(
+                                    "image_url".to_string(),
+                                    json!({"url": url_val}),
+                                );
+                            }
                         }
                         _ => {}
                     }
@@ -1050,6 +1060,7 @@ mod tests {
         let user_content = messages[0]["content"].as_array().unwrap();
         assert_eq!(user_content[0]["type"], "text");
         assert_eq!(user_content[1]["type"], "image_url");
+        assert_eq!(user_content[1]["image_url"]["url"], "http://example.com/img.png");
         // Assistant content should be flattened to a plain string
         assert_eq!(messages[1]["content"], "Hi there");
     }
