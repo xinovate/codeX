@@ -18,9 +18,10 @@ OpenAI Codex CLI 上游在 2026 年初删除了 `wire_api = "chat"`（Chat Compl
 **本项目的核心价值：**
 
 1. **协议转换层** — 完整实现 Responses API → Chat Completions 双向转换，透明处理 tool calls、reasoning content、multi-turn 上下文等差异
-2. **预编译分发** — GitHub Releases 提供开箱即用的预编译二进制（Linux/Windows/macOS），无需安装 Rust 或 Node.js
-3. **自更新机制** — `codex update` 一键升级，自动检测平台下载最新版本
-4. **中文文档** — 面向国内开发者的完整安装和配置指南
+2. **MCP 工具支持** — 通过 MCP 服务器扩展能力（Web 搜索、网页阅读等），国内 Provider 下可正常调用
+3. **预编译分发** — GitHub Releases 提供开箱即用的预编译二进制（Linux/Windows/macOS），无需安装 Rust 或 Node.js
+4. **自更新机制** — `codex update` 一键升级，自动检测平台下载最新版本
+5. **中文文档** — 面向国内开发者的完整安装和配置指南
 
 **简单来说：上游关了门，我们建了桥。**
 
@@ -280,6 +281,10 @@ model_catalog_json = "/home/用户名/.codex/custom_models.json"
 ```
 
 详细配置见 [`codex-rs/CHINA_PROVIDER.md`](codex-rs/CHINA_PROVIDER.md)。
+
+### MCP 服务器配置
+
+在 `config.toml` 中添加 `[mcp_servers]` 段即可启用第三方工具（Web 搜索、网页阅读等），详见 [CHINA_PROVIDER.md 的 MCP 配置章节](codex-rs/CHINA_PROVIDER.md)。
 
 ## 国内服务商配置
 

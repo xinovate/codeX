@@ -329,6 +329,7 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 ### Q: 支持哪些功能？
 
 - 工具调用（function calling）
+- MCP 工具（Web 搜索、网页阅读等第三方工具服务器）
 - 多轮对话
 - 推理内容（thinking / reasoning）
 - CLI 自动将内部 Responses API 转换为 Chat Completions API 格式
@@ -359,3 +360,54 @@ model_catalog_json = "C:\\Users\\你的用户名\\.codex\\custom_models.json"
 personality = "pragmatic"
 ```
 
+### Q: 如何配置 MCP 服务器？
+
+在 `config.toml` 中添加 `[mcp_servers]` 段即可。MCP 工具会在对话中自动注入给模型使用。
+
+**HTTP transport（推荐）：**
+
+```toml
+[mcp_servers.web-search]
+url = "https://example.com/mcp"
+bearer_token_env_var = "YOUR_API_KEY_ENV"
+```
+
+**STDIO transport：**
+
+```toml
+[mcp_servers.my-tool]
+command = "my-mcp-server"
+args = ["--port", "8080"]
+env_vars = ["MY_API_KEY"]
+```
+
+**工具审批配置（可选）：**
+
+```toml
+[mcp_servers.web-search.tools.search]
+approval_mode = "approve"   # 自动批准，无需每次确认
+```
+
+示例 — 智谱 GLM + MCP 搜索和网页阅读完整配置：
+
+```toml
+model = "glm-5.1"
+model_provider = "zhipu"
+
+[model_providers.zhipu]
+name = "ZhiPuGLM"
+base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
+env_key = "ZHIPU_API_KEY"
+wire_api = "chat"
+
+[mcp_servers.web-search-prime]
+url = "https://open.bigmodel.cn/api/mcp/web_search_prime/mcp"
+bearer_token_env_var = "ZHIPU_API_KEY"
+
+[mcp_servers.web-search-prime.tools.web_search_prime]
+approval_mode = "approve"
+
+[mcp_servers.web-reader]
+url = "https://open.bigmodel.cn/api/mcp/web_reader/mcp"
+bearer_token_env_var = "ZHIPU_API_KEY"
+```
