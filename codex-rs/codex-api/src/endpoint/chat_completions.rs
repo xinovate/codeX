@@ -890,13 +890,15 @@ fn convert_request_body(responses_body: &mut Value) {
     // 6. Convert tools from Responses API format to Chat Completions format
     //    Responses:  {"type":"function", "name":"x", "description":"...", "parameters":{...}}
     //    Chat:      {"type":"function", "function":{"name":"x", "description":"...", "parameters":{...}}}
+    //    Namespace: {"type":"namespace", "name":"...", "tools":[{"type":"function", ...}]}
+    //               → flatten inner function tools into top-level tools
     if let Some(tools) = obj.remove("tools") {
         if let Some(arr) = tools.as_array() {
-            let converted: Vec<Value> = arr
-                .iter()
-                .filter_map(|tool| {
-                    if let Some(t) = tool.as_object() {
-                        if t.get("type").and_then(|v| v.as_str()) == Some("function") {
+            let mut converted: Vec<Value> = Vec::new();
+            for tool in arr {
+                if let Some(t) = tool.as_object() {
+                    match t.get("type").and_then(|v| v.as_str()) {
+                        Some("function") => {
                             // Move name/description/parameters/strict into a nested "function" object
                             let func = json!({
                                 "name": t.get("name").cloned().unwrap_or(Value::Null),
@@ -915,14 +917,50 @@ fn convert_request_body(responses_body: &mut Value) {
                                     }
                                 }
                             }
-                            return Some(chat_tool);
+                            converted.push(chat_tool);
+                        }
+                        Some("namespace") => {
+                            // Flatten namespace tools into top-level function tools.
+                            // Chat Completions API doesn't support namespaces, so we
+                            // encode the namespace into the tool name as {namespace}{name}
+                            // so we can reconstruct it when the model calls the tool back.
+                            let namespace = t.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                            if let Some(inner_tools) = t.get("tools").and_then(|v| v.as_array()) {
+                                for inner_tool in inner_tools {
+                                    if let Some(inner) = inner_tool.as_object() {
+                                        if inner.get("type").and_then(|v| v.as_str()) == Some("function") {
+                                            let plain_name = inner.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                            let full_name = format!("{}{}", namespace, plain_name);
+                                            let func = json!({
+                                                "name": full_name,
+                                                "description": inner.get("description").cloned().unwrap_or(Value::Null),
+                                                "parameters": inner.get("parameters").cloned().unwrap_or(Value::Null),
+                                                "strict": inner.get("strict").cloned().unwrap_or(Value::Null),
+                                            });
+                                            let mut chat_tool = json!({"type": "function", "function": func});
+                                            if let Some(obj) = chat_tool.as_object_mut() {
+                                                for (k, v) in inner {
+                                                    if !matches!(
+                                                        k.as_str(),
+                                                        "type" | "name" | "description" | "parameters" | "strict"
+                                                    ) {
+                                                        obj.insert(k.clone(), v.clone());
+                                                    }
+                                                }
+                                            }
+                                            converted.push(chat_tool);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {
+                            // Drop non-function tools (local_shell, web_search, etc.)
+                            // Chat Completions API only supports type:"function"
                         }
                     }
-                    // Drop non-function tools (local_shell, web_search, etc.)
-                    // Chat Completions API only supports type:"function"
-                    None
-                })
-                .collect();
+                }
+            }
             chat_obj.insert("tools".to_string(), Value::Array(converted));
         } else {
             chat_obj.insert("tools".to_string(), tools);
@@ -936,12 +974,6 @@ fn convert_request_body(responses_body: &mut Value) {
     }
 
     *responses_body = Value::Object(chat_obj);
-
-    // Debug: log the converted request body for troubleshooting
-    tracing::debug!(
-        "Chat Completions request body: {}",
-        serde_json::to_string(responses_body).unwrap_or_default()
-    );
 }
 
 #[cfg(test)]
@@ -1023,6 +1055,37 @@ mod tests {
         assert!(tools[0].get("description").is_none());
         assert_eq!(body["tool_choice"], "auto");
         assert_eq!(body["temperature"], 0.7);
+    }
+
+    #[test]
+    fn flattens_namespace_tools_into_function_tools() {
+        let mut body = json!({
+            "model": "test",
+            "input": [{"role": "user", "content": "Search the web"}],
+            "tools": [
+                {
+                    "type": "namespace",
+                    "name": "mcp__web_search__",
+                    "description": "Web search tools",
+                    "tools": [
+                        {"type": "function", "name": "web_search", "description": "Search web", "parameters": {"type": "object"}, "strict": false}
+                    ]
+                },
+                {"type": "function", "name": "get_weather", "description": "Get weather", "parameters": {"type": "object"}, "strict": false}
+            ],
+            "tool_choice": "auto",
+        });
+
+        convert_request_body(&mut body);
+
+        let tools = body["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 2);
+        assert_eq!(tools[0]["type"], "function");
+        assert_eq!(tools[0]["function"]["name"], "web_search");
+        assert_eq!(tools[1]["type"], "function");
+        assert_eq!(tools[1]["function"]["name"], "get_weather");
+        // Namespace wrapper should be gone
+        assert!(body["tools"].as_array().unwrap().iter().all(|t| t.get("tools").is_none()));
     }
 
     #[test]

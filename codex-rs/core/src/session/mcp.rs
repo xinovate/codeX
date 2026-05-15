@@ -194,12 +194,26 @@ impl Session {
         reason = "MCP tool metadata reads through the session-owned manager guard"
     )]
     pub(crate) async fn resolve_mcp_tool_info(&self, tool_name: &ToolName) -> Option<ToolInfo> {
-        self.services
-            .mcp_connection_manager
-            .read()
-            .await
-            .resolve_tool_info(tool_name)
-            .await
+        let manager = self.services.mcp_connection_manager.read().await;
+        let all_tools = manager.list_all_tools().await;
+        all_tools
+            .values()
+            .find(|tool| tool.canonical_tool_name() == *tool_name)
+            .cloned()
+            .or_else(|| {
+                // Fallback: Chat Completions API flattens namespace tools into
+                // plain function tools by concatenating namespace + name.
+                // When the model calls back, namespace is None and name is the
+                // concatenated form (e.g. "mcp__server__tool"). Match against
+                // canonical display names to find the original tool.
+                if tool_name.namespace.is_none() {
+                    all_tools.into_values().find(|tool| {
+                        tool.canonical_tool_name().display() == tool_name.name
+                    })
+                } else {
+                    None
+                }
+            })
     }
 
     async fn refresh_mcp_servers_inner(
