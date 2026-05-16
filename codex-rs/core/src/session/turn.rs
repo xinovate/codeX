@@ -129,6 +129,7 @@ async fn preprocess_images_with_mcp(
     sess: &Session,
     turn_context: &TurnContext,
     image_analysis_config: &Option<ImageAnalysisConfig>,
+    image_cache: &mut HashMap<String, String>,
 ) -> Vec<ResponseItem> {
     // Check if any items contain images before doing any work.
     let has_images = items.iter().any(|item| match item {
@@ -148,65 +149,73 @@ async fn preprocess_images_with_mcp(
             for c in content.drain(..) {
                 match c {
                     ContentItem::InputImage { image_url, .. } => {
-                        let replacement = match image_analysis_config {
-                            Some(config) => {
-                                let call_id = format!("img-preprocess-{}", uuid::Uuid::new_v4());
-                                let invocation = codex_protocol::protocol::McpInvocation {
-                                    server: config.mcp_server.clone(),
-                                    tool: config.tool_name.clone(),
-                                    arguments: Some(serde_json::json!({
-                                        "image_source": "<pasted image>",
-                                        "prompt": "Describe image content"
-                                    })),
-                                };
+                        // Use cached result if available (avoids redundant MCP calls
+                        // when the same image appears in history across loop iterations).
+                        let replacement = if let Some(cached) = image_cache.get(&image_url).cloned() {
+                            cached
+                        } else {
+                            let text = match image_analysis_config {
+                                Some(config) => {
+                                    let call_id = format!("img-preprocess-{}", uuid::Uuid::new_v4());
+                                    let invocation = codex_protocol::protocol::McpInvocation {
+                                        server: config.mcp_server.clone(),
+                                        tool: config.tool_name.clone(),
+                                        arguments: Some(serde_json::json!({
+                                            "image_source": "<pasted image>",
+                                            "prompt": "Describe image content"
+                                        })),
+                                    };
 
-                                // Notify TUI: MCP tool call started.
-                                sess.send_event(
-                                    turn_context,
-                                    EventMsg::McpToolCallBegin(McpToolCallBeginEvent {
-                                        call_id: call_id.clone(),
-                                        invocation: invocation.clone(),
-                                        mcp_app_resource_uri: None,
-                                    }),
-                                ).await;
+                                    // Notify TUI: MCP tool call started.
+                                    sess.send_event(
+                                        turn_context,
+                                        EventMsg::McpToolCallBegin(McpToolCallBeginEvent {
+                                            call_id: call_id.clone(),
+                                            invocation: invocation.clone(),
+                                            mcp_app_resource_uri: None,
+                                        }),
+                                    ).await;
 
-                                let start = std::time::Instant::now();
-                                let analysis_result = analyze_image_via_mcp(sess, &image_url, config).await;
+                                    let start = std::time::Instant::now();
+                                    let analysis_result = analyze_image_via_mcp(sess, &image_url, config).await;
 
-                                // Notify TUI: MCP tool call ended.
-                                let mcp_result = match &analysis_result {
-                                    Ok(desc) => Ok(codex_protocol::mcp::CallToolResult {
-                                        content: vec![serde_json::json!({"type": "text", "text": desc})],
-                                        structured_content: None,
-                                        is_error: None,
-                                        meta: None,
-                                    }),
-                                    Err(e) => Err(e.to_string()),
-                                };
-                                sess.send_event(
-                                    turn_context,
-                                    EventMsg::McpToolCallEnd(McpToolCallEndEvent {
-                                        call_id,
-                                        invocation,
-                                        mcp_app_resource_uri: None,
-                                        duration: start.elapsed(),
-                                        result: mcp_result,
-                                    }),
-                                ).await;
+                                    // Notify TUI: MCP tool call ended.
+                                    let mcp_result = match &analysis_result {
+                                        Ok(desc) => Ok(codex_protocol::mcp::CallToolResult {
+                                            content: vec![serde_json::json!({"type": "text", "text": desc})],
+                                            structured_content: None,
+                                            is_error: None,
+                                            meta: None,
+                                        }),
+                                        Err(e) => Err(e.to_string()),
+                                    };
+                                    sess.send_event(
+                                        turn_context,
+                                        EventMsg::McpToolCallEnd(McpToolCallEndEvent {
+                                            call_id,
+                                            invocation,
+                                            mcp_app_resource_uri: None,
+                                            duration: start.elapsed(),
+                                            result: mcp_result,
+                                        }),
+                                    ).await;
 
-                                match analysis_result {
-                                    Ok(description) => {
-                                        format!("[图片内容：{}]", description)
-                                    }
-                                    Err(e) => {
-                                        warn!("MCP image analysis failed: {}", e);
-                                        "[图片处理失败，当前模型无法识别图片]".to_string()
+                                    match analysis_result {
+                                        Ok(description) => {
+                                            format!("[图片内容：{}]", description)
+                                        }
+                                        Err(e) => {
+                                            warn!("MCP image analysis failed: {}", e);
+                                            "[图片处理失败，当前模型无法识别图片]".to_string()
+                                        }
                                     }
                                 }
-                            }
-                            None => {
-                                "[图片已忽略：当前模型不支持图片输入]".to_string()
-                            }
+                                None => {
+                                    "[图片已忽略：当前模型不支持图片输入]".to_string()
+                                }
+                            };
+                            image_cache.insert(image_url.clone(), text.clone());
+                            text
                         };
                         new_content.push(ContentItem::InputText { text: replacement });
                     }
@@ -567,6 +576,7 @@ pub(crate) async fn run_turn(
     // 1. At the start of a turn, so the fresh user prompt in `input` gets sampled first.
     // 2. After auto-compact, when model/tool continuation needs to resume before any steer.
     let mut can_drain_pending_input = input.is_empty();
+    let mut image_cache: HashMap<String, String> = HashMap::new();
 
     loop {
         if run_pending_session_start_hooks(&sess, &turn_context).await {
@@ -648,6 +658,7 @@ pub(crate) async fn run_turn(
             &explicitly_enabled_connectors,
             skills_outcome,
             cancellation_token.child_token(),
+            &mut image_cache,
         )
         .await
         {
@@ -1167,6 +1178,7 @@ async fn run_sampling_request(
     explicitly_enabled_connectors: &HashSet<String>,
     skills_outcome: Option<&SkillLoadOutcome>,
     cancellation_token: CancellationToken,
+    mut image_cache: &mut HashMap<String, String>,
 ) -> CodexResult<SamplingRequestResult> {
     let router = built_tools(
         sess.as_ref(),
@@ -1211,6 +1223,7 @@ async fn run_sampling_request(
             &sess,
             &turn_context,
             &turn_context.config.image_analysis,
+            &mut image_cache,
         )
         .await;
         let prompt = build_prompt(
