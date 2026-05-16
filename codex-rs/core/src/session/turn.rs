@@ -86,6 +86,9 @@ use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::AgentMessageContentDeltaEvent;
 use codex_protocol::protocol::AgentReasoningSectionBreakEvent;
 use codex_protocol::protocol::AskForApproval;
+use codex_protocol::protocol::McpInvocation;
+use codex_protocol::protocol::McpToolCallBeginEvent;
+use codex_protocol::protocol::McpToolCallEndEvent;
 use codex_protocol::protocol::CodexErrorInfo;
 use codex_protocol::protocol::ErrorEvent;
 use codex_protocol::protocol::EventMsg;
@@ -124,6 +127,7 @@ use tracing::warn;
 async fn preprocess_images_with_mcp(
     mut items: Vec<ResponseItem>,
     sess: &Session,
+    turn_context: &TurnContext,
     image_analysis_config: &Option<ImageAnalysisConfig>,
 ) -> Vec<ResponseItem> {
     // Check if any items contain images before doing any work.
@@ -146,7 +150,51 @@ async fn preprocess_images_with_mcp(
                     ContentItem::InputImage { image_url, .. } => {
                         let replacement = match image_analysis_config {
                             Some(config) => {
-                                match analyze_image_via_mcp(sess, &image_url, config).await {
+                                let call_id = format!("img-preprocess-{}", uuid::Uuid::new_v4());
+                                let invocation = codex_protocol::protocol::McpInvocation {
+                                    server: config.mcp_server.clone(),
+                                    tool: config.tool_name.clone(),
+                                    arguments: Some(serde_json::json!({
+                                        "image_source": "<pasted image>",
+                                        "prompt": "Describe image content"
+                                    })),
+                                };
+
+                                // Notify TUI: MCP tool call started.
+                                sess.send_event(
+                                    turn_context,
+                                    EventMsg::McpToolCallBegin(McpToolCallBeginEvent {
+                                        call_id: call_id.clone(),
+                                        invocation: invocation.clone(),
+                                        mcp_app_resource_uri: None,
+                                    }),
+                                ).await;
+
+                                let start = std::time::Instant::now();
+                                let analysis_result = analyze_image_via_mcp(sess, &image_url, config).await;
+
+                                // Notify TUI: MCP tool call ended.
+                                let mcp_result = match &analysis_result {
+                                    Ok(desc) => Ok(codex_protocol::mcp::CallToolResult {
+                                        content: vec![serde_json::json!({"type": "text", "text": desc})],
+                                        structured_content: None,
+                                        is_error: None,
+                                        meta: None,
+                                    }),
+                                    Err(e) => Err(e.to_string()),
+                                };
+                                sess.send_event(
+                                    turn_context,
+                                    EventMsg::McpToolCallEnd(McpToolCallEndEvent {
+                                        call_id,
+                                        invocation,
+                                        mcp_app_resource_uri: None,
+                                        duration: start.elapsed(),
+                                        result: mcp_result,
+                                    }),
+                                ).await;
+
+                                match analysis_result {
                                     Ok(description) => {
                                         format!("[图片内容：{}]", description)
                                     }
@@ -1161,6 +1209,7 @@ async fn run_sampling_request(
         let prompt_input = preprocess_images_with_mcp(
             prompt_input,
             &sess,
+            &turn_context,
             &turn_context.config.image_analysis,
         )
         .await;
