@@ -576,7 +576,6 @@ pub(crate) async fn run_turn(
     // 1. At the start of a turn, so the fresh user prompt in `input` gets sampled first.
     // 2. After auto-compact, when model/tool continuation needs to resume before any steer.
     let mut can_drain_pending_input = input.is_empty();
-    let mut image_cache: HashMap<String, String> = HashMap::new();
 
     loop {
         if run_pending_session_start_hooks(&sess, &turn_context).await {
@@ -658,7 +657,6 @@ pub(crate) async fn run_turn(
             &explicitly_enabled_connectors,
             skills_outcome,
             cancellation_token.child_token(),
-            &mut image_cache,
         )
         .await
         {
@@ -1178,7 +1176,6 @@ async fn run_sampling_request(
     explicitly_enabled_connectors: &HashSet<String>,
     skills_outcome: Option<&SkillLoadOutcome>,
     cancellation_token: CancellationToken,
-    mut image_cache: &mut HashMap<String, String>,
 ) -> CodexResult<SamplingRequestResult> {
     let router = built_tools(
         sess.as_ref(),
@@ -1218,14 +1215,17 @@ async fn run_sampling_request(
                 .await
                 .for_prompt(&turn_context.model_info.input_modalities)
         };
-        let prompt_input = preprocess_images_with_mcp(
-            prompt_input,
-            &sess,
-            &turn_context,
-            &turn_context.config.image_analysis,
-            &mut image_cache,
-        )
-        .await;
+        let prompt_input = {
+            let mut image_cache = sess.image_cache.lock().await;
+            preprocess_images_with_mcp(
+                prompt_input,
+                &sess,
+                &turn_context,
+                &turn_context.config.image_analysis,
+                &mut image_cache,
+            )
+            .await
+        };
         let prompt = build_prompt(
             prompt_input,
             router.as_ref(),

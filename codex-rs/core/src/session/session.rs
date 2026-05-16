@@ -29,6 +29,9 @@ pub(crate) struct Session {
     pub(crate) guardian_review_session: GuardianReviewSessionManager,
     pub(crate) services: SessionServices,
     pub(super) next_internal_sub_id: AtomicU64,
+    /// Cache for MCP image analysis results (image_url -> description text).
+    /// Persists across turns so the same image is only analyzed once per session.
+    pub(crate) image_cache: Mutex<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -865,6 +868,7 @@ impl Session {
                 guardian_review_session: GuardianReviewSessionManager::default(),
                 services,
                 next_internal_sub_id: AtomicU64::new(0),
+                image_cache: Mutex::new(HashMap::new()),
             });
             if let Some(network_policy_decider_session) = network_policy_decider_session {
                 let mut guard = network_policy_decider_session.write().await;
