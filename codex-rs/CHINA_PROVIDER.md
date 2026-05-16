@@ -411,3 +411,48 @@ approval_mode = "approve"
 url = "https://open.bigmodel.cn/api/mcp/web_reader/mcp"
 bearer_token_env_var = "ZHIPU_API_KEY"
 ```
+
+### 图片识别配置（可选）
+
+国内 Provider 的 Coding API 通常不支持图片输入。Codex 支持通过 MCP 工具自动识别图片内容并转为文字描述，避免粘贴图片时报错。
+
+在 `config.toml` 中添加 `[image_analysis]` 段：
+
+```toml
+[image_analysis]
+mcp_server = "zai-mcp-server"    # MCP server 名称（对应 [mcp_servers.xxx] 中的 xxx）
+tool_name = "image_analysis"      # MCP 工具名称
+```
+
+需要先在 `[mcp_servers]` 中配置对应的 MCP server。完整示例：
+
+```toml
+model = "glm-5.1"
+model_provider = "zhipu"
+
+[model_providers.zhipu]
+name = "ZhiPuGLM"
+base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
+env_key = "ZHIPU_API_KEY"
+wire_api = "chat"
+
+# MCP 图片识别 server
+[mcp_servers.zai-mcp-server]
+command = "zai-mcp-server"
+args = []
+env_vars = ["Z_AI_API_KEY"]
+env = { "Z_AI_MODE" = "ZHIPU" }
+
+# 启用图片识别
+[image_analysis]
+mcp_server = "zai-mcp-server"
+tool_name = "image_analysis"
+```
+
+| 场景 | 行为 |
+|------|------|
+| 配置了 `[image_analysis]` + MCP server | 粘贴图片 → 自动调 MCP 工具识别 → 替换为文字描述 |
+| 只配置了 `[image_analysis]` 但 MCP server 不可用 | 图片替换为 `[图片处理失败]` |
+| 未配置 `[image_analysis]` | 图片替换为 `[图片已忽略：当前模型不支持图片输入]` |
+
+> **注意**：`zai-mcp-server` 的 `image_analysis` 工具包含在智谱 Coding Plan 中，不额外收费。其他 MCP 图片识别工具可能产生额外费用，请确认后使用。

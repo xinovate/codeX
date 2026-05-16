@@ -65,6 +65,9 @@ GitHub Actions 自动构建以下平台：
 - `codex-rs/model-provider-info/src/lib.rs` - China provider detection, WireApi::Chat variant
 - `codex-rs/core/src/client.rs` - ChatCompletionsClient integration
 - `codex-rs/core/src/session/mcp.rs` - MCP tool resolution with namespace fallback for Chat Completions path
+- `codex-rs/core/src/session/turn.rs` - MCP image preprocessing (preprocess_images_with_mcp)
+- `codex-rs/core/src/config/mod.rs` - image_analysis config propagation
+- `codex-rs/config/src/config_toml.rs` - ImageAnalysisConfig struct
 - `codex-rs/tui/src/updates.rs` - Update check URL (points to xinovate/codex GitHub releases)
 - `codex-rs/tui/src/update_versions.rs` - Tag prefix parsing (uses `v*` instead of `rust-v*`)
 - `codex-rs/tui/src/update_action.rs` - Standalone update points to our releases page

@@ -136,6 +136,7 @@ fn spawn_chat_completions_stream(
         let mut response_id: Option<String> = None;
         let mut accumulated_text = String::new();
         let mut accumulated_reasoning = String::new();
+        let mut in_think_block = false;
         let mut message_item_added = false;
         let mut _last_model: Option<String> = None;
 
@@ -218,10 +219,13 @@ fn spawn_chat_completions_stream(
                 .and_then(|a| a.first())
             {
                 if let Some(delta) = choices.get("delta") {
-                    // Content → output_text.delta
+                    // Content → output_text.delta (with <think*>...</think*> filtering)
+                    // GLM/DeepSeek models sometimes emit thinking content wrapped in
+                    // <think...>...</think*> tags mixed into regular text output.
+                    // We filter these out and redirect to ReasoningSummaryDelta.
                     if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
                         if !content.is_empty() {
-                            // Emit message item added on first text content
+                            // Ensure message item is added before any content
                             if !message_item_added {
                                 let _ = tx_event
                                     .send(Ok(ResponseEvent::OutputItemAdded(
@@ -235,10 +239,81 @@ fn spawn_chat_completions_stream(
                                     .await;
                                 message_item_added = true;
                             }
-                            accumulated_text.push_str(content);
-                            let _ = tx_event
-                                .send(Ok(ResponseEvent::OutputTextDelta(content.to_string())))
-                                .await;
+
+                            // State machine: scan content for <think*>...</think*> tags
+                            let mut remaining: &str = content;
+                            while !remaining.is_empty() {
+                                if in_think_block {
+                                    // Inside <think*> block — look for closing tag
+                                    if let Some(end_pos) = remaining.find("</think") {
+                                        // Emit accumulated think content as reasoning
+                                        let think_text = &remaining[..end_pos];
+                                        if !think_text.is_empty() {
+                                            accumulated_reasoning.push_str(think_text);
+                                            let _ = tx_event
+                                                .send(Ok(ResponseEvent::ReasoningSummaryDelta {
+                                                    delta: think_text.to_string(),
+                                                    summary_index: 0,
+                                                }))
+                                                .await;
+                                        }
+                                        // Skip past the closing tag
+                                        let skip = remaining[end_pos..]
+                                            .find('>')
+                                            .map(|p| end_pos + p + 1)
+                                            .unwrap_or_else(|| {
+                                                remaining[end_pos..]
+                                                    .find('\n')
+                                                    .map(|p| end_pos + p + 1)
+                                                    .unwrap_or(remaining.len())
+                                            });
+                                        remaining = &remaining[skip.min(remaining.len())..];
+                                        in_think_block = false;
+                                    } else {
+                                        // Still inside think block, emit as reasoning
+                                        accumulated_reasoning.push_str(remaining);
+                                        let _ = tx_event
+                                            .send(Ok(ResponseEvent::ReasoningSummaryDelta {
+                                                delta: remaining.to_string(),
+                                                summary_index: 0,
+                                            }))
+                                            .await;
+                                        break;
+                                    }
+                                } else {
+                                    // Outside think block — look for opening tag
+                                    if let Some(start_pos) = remaining.find("<think") {
+                                        // Emit text before <think as normal output
+                                        if start_pos > 0 {
+                                            let before = &remaining[..start_pos];
+                                            accumulated_text.push_str(before);
+                                            let _ = tx_event
+                                                .send(Ok(ResponseEvent::OutputTextDelta(
+                                                    before.to_string(),
+                                                )))
+                                                .await;
+                                        }
+                                        // Skip past the opening tag (up to > or \n)
+                                        let after_tag = &remaining[start_pos + 6..];
+                                        let tag_end = after_tag
+                                            .find('>')
+                                            .map(|p| p + 1)
+                                            .or_else(|| after_tag.find('\n').map(|p| p + 1))
+                                            .unwrap_or(after_tag.len());
+                                        remaining = &after_tag[tag_end.min(after_tag.len())..];
+                                        in_think_block = true;
+                                    } else {
+                                        // No think tag, emit as normal output
+                                        accumulated_text.push_str(remaining);
+                                        let _ = tx_event
+                                            .send(Ok(ResponseEvent::OutputTextDelta(
+                                                remaining.to_string(),
+                                            )))
+                                            .await;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -975,6 +1050,13 @@ fn convert_request_body(responses_body: &mut Value) {
 
     *responses_body = Value::Object(chat_obj);
 }
+
+// ---------------------------------------------------------------------------
+// Image preprocessing: call vision API to describe images before sending
+// to Chat Completions providers that don't support image input.
+// ---------------------------------------------------------------------------
+
+/// Derive vision API configuration from the Coding API base URL.
 
 #[cfg(test)]
 mod tests {

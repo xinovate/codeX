@@ -286,6 +286,16 @@ model_catalog_json = "/home/用户名/.codex/custom_models.json"
 
 在 `config.toml` 中添加 `[mcp_servers]` 段即可启用第三方工具（Web 搜索、网页阅读等），详见 [CHINA_PROVIDER.md 的 MCP 配置章节](codex-rs/CHINA_PROVIDER.md)。
 
+### 图片识别配置
+
+通过 `[image_analysis]` 段配置 MCP 图片识别工具，粘贴图片时自动识别内容。详见 [CHINA_PROVIDER.md 的图片识别章节](codex-rs/CHINA_PROVIDER.md)。
+
+```toml
+[image_analysis]
+mcp_server = "zai-mcp-server"
+tool_name = "image_analysis"
+```
+
 ## 国内服务商配置
 
 - [**国内服务商配置指南**](codex-rs/CHINA_PROVIDER.md)

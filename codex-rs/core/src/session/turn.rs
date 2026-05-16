@@ -95,6 +95,7 @@ use codex_protocol::protocol::ReasoningRawContentDeltaEvent;
 use codex_protocol::protocol::TurnDiffEvent;
 use codex_protocol::protocol::WarningEvent;
 use codex_protocol::user_input::UserInput;
+use codex_config::config_toml::ImageAnalysisConfig;
 use codex_tools::ToolName;
 use codex_tools::filter_tool_suggest_discoverable_tools_for_client;
 use codex_utils_stream_parser::AssistantTextChunk;
@@ -114,6 +115,153 @@ use tracing::instrument;
 use tracing::trace;
 use tracing::trace_span;
 use tracing::warn;
+
+/// Preprocess images in the prompt input by calling an MCP image analysis tool.
+///
+/// When an `[image_analysis]` config is present, pasted images are sent to the
+/// specified MCP tool for description and replaced with text. When no config is
+/// set, images are replaced with a placeholder message.
+async fn preprocess_images_with_mcp(
+    mut items: Vec<ResponseItem>,
+    sess: &Session,
+    image_analysis_config: &Option<ImageAnalysisConfig>,
+) -> Vec<ResponseItem> {
+    // Check if any items contain images before doing any work.
+    let has_images = items.iter().any(|item| match item {
+        ResponseItem::Message { content, .. } => {
+            content.iter().any(|c| matches!(c, ContentItem::InputImage { .. }))
+        }
+        _ => false,
+    });
+
+    if !has_images {
+        return items;
+    }
+
+    for item in &mut items {
+        if let ResponseItem::Message { content, .. } = item {
+            let mut new_content = Vec::with_capacity(content.len());
+            for c in content.drain(..) {
+                match c {
+                    ContentItem::InputImage { image_url, .. } => {
+                        let replacement = match image_analysis_config {
+                            Some(config) => {
+                                match analyze_image_via_mcp(sess, &image_url, config).await {
+                                    Ok(description) => {
+                                        format!("[图片内容：{}]", description)
+                                    }
+                                    Err(e) => {
+                                        warn!("MCP image analysis failed: {}", e);
+                                        "[图片处理失败，当前模型无法识别图片]".to_string()
+                                    }
+                                }
+                            }
+                            None => {
+                                "[图片已忽略：当前模型不支持图片输入]".to_string()
+                            }
+                        };
+                        new_content.push(ContentItem::InputText { text: replacement });
+                    }
+                    other => {
+                        new_content.push(other);
+                    }
+                }
+            }
+            *content = new_content;
+        }
+    }
+
+    items
+}
+
+/// Call an MCP image analysis tool to describe an image.
+///
+/// If `image_url` is a base64 data URL, saves it to a temp file first because
+/// most MCP image tools only accept file paths or remote URLs.
+async fn analyze_image_via_mcp(
+    sess: &Session,
+    image_url: &str,
+    config: &ImageAnalysisConfig,
+) -> anyhow::Result<String> {
+    // Resolve image source: convert base64 data URLs to temp files.
+    let image_source = if image_url.starts_with("data:image/") {
+        let path = save_data_url_to_temp_file(image_url)?;
+        path
+    } else {
+        image_url.to_string()
+    };
+
+    let arguments = serde_json::json!({
+        "image_source": image_source,
+        "prompt": "Describe the content of this image in detail, focusing on what is visually shown (text, UI elements, code, diagrams, etc.). Use the same language as the image content."
+    });
+
+    let result = sess
+        .call_tool(
+            &config.mcp_server,
+            &config.tool_name,
+            Some(arguments),
+            None,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("MCP call_tool failed: {}", e))?;
+
+    if result.is_error.unwrap_or(false) {
+        let error_text = extract_text_from_mcp_content(&result.content);
+        return Err(anyhow::anyhow!("MCP tool returned error: {}", error_text));
+    }
+
+    let description = extract_text_from_mcp_content(&result.content);
+    if description.is_empty() {
+        return Err(anyhow::anyhow!("MCP tool returned empty description"));
+    }
+
+    Ok(description)
+}
+
+/// Extract text content from MCP CallToolResult content array.
+fn extract_text_from_mcp_content(content: &[serde_json::Value]) -> String {
+    let mut text = String::new();
+    for item in content {
+        if let Some(s) = item.get("text").and_then(|v| v.as_str()) {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(s);
+        }
+    }
+    text
+}
+
+/// Save a base64 data URL to a temporary file and return its path.
+///
+/// Expected format: `data:image/<ext>;base64,<data>`
+/// The file is written to the OS temp dir and NOT automatically deleted
+/// (the MCP server needs time to read it; OS will clean up temp dir eventually).
+fn save_data_url_to_temp_file(data_url: &str) -> anyhow::Result<String> {
+    // Parse: data:image/<ext>;base64,<base64data>
+    let (mime_part, b64_data) = data_url
+        .strip_prefix("data:")
+        .and_then(|s| s.split_once(","))
+        .ok_or_else(|| anyhow::anyhow!("invalid data URL format"))?;
+
+    let ext = mime_part
+        .strip_prefix("image/")
+        .and_then(|s| s.split(';').next())
+        .unwrap_or("png");
+
+    let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, b64_data)
+        .map_err(|e| anyhow::anyhow!("base64 decode failed: {}", e))?;
+
+    let tmp_dir = std::env::temp_dir();
+    let file_name = format!("codex_image_{}.{}", uuid::Uuid::new_v4(), ext);
+    let path = tmp_dir.join(&file_name);
+
+    std::fs::write(&path, &bytes)
+        .map_err(|e| anyhow::anyhow!("failed to write temp image file: {}", e))?;
+
+    Ok(path.to_string_lossy().to_string())
+}
 
 /// Takes a user message as input and runs a loop where, at each sampling request, the model
 /// replies with either:
@@ -1010,6 +1158,12 @@ async fn run_sampling_request(
                 .await
                 .for_prompt(&turn_context.model_info.input_modalities)
         };
+        let prompt_input = preprocess_images_with_mcp(
+            prompt_input,
+            &sess,
+            &turn_context.config.image_analysis,
+        )
+        .await;
         let prompt = build_prompt(
             prompt_input,
             router.as_ref(),

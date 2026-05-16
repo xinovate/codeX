@@ -418,6 +418,20 @@ pub struct ConfigToml {
     pub experimental_use_freeform_apply_patch: Option<bool>,
     /// Preferred OSS provider for local models, e.g. "lmstudio" or "ollama".
     pub oss_provider: Option<String>,
+
+    /// Configuration for MCP-based image analysis preprocessing.
+    /// When set, pasted images will be sent to the specified MCP tool for
+    /// description before being passed to the model as text.
+    pub image_analysis: Option<ImageAnalysisConfig>,
+}
+
+/// Configuration for using an MCP tool to analyze images before sending to the model.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
+pub struct ImageAnalysisConfig {
+    /// Name of the MCP server (must match a key in `[mcp_servers]`).
+    pub mcp_server: String,
+    /// Name of the MCP tool to call for image analysis.
+    pub tool_name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
