@@ -1,7 +1,5 @@
 # Codex CLI - China Provider
 
-> **与小米 Mimo 联合共建** - 小米大模型 core 团队为本项目提供 API 资源，共同推进国内 AI 编程工具生态
-
 ## 为什么需要这个项目？
 
 OpenAI Codex CLI 上游在 2026 年初删除了 `wire_api = "chat"`（Chat Completions API）支持，**要求所有 provider 必须实现 OpenAI Responses API**（`/v1/responses`）。

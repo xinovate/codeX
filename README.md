@@ -1,7 +1,5 @@
 # Codex CLI - China Provider Fork
 
-> **与小米 Mimo 联合共建** - 小米大模型 core 团队为本项目提供 API 资源，共同推进国内 AI 编程工具生态
-
 基于 OpenAI Codex CLI 的 fork，让国内大模型服务商（小米 Mimo、DeepSeek、Kimi Code、火山引擎/豆包 等）可以直接接入 Codex，开箱即用。
 
 ## 为什么需要这个项目？
