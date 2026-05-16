@@ -419,7 +419,7 @@ bearer_token_env_var = "ZHIPU_API_KEY"
 ```toml
 [image_analysis]
 mcp_server = "zai-mcp-server"    # MCP server 名称（对应 [mcp_servers.xxx] 中的 xxx）
-tool_name = "image_analysis"      # MCP 工具名称
+tool_name = "analyze_image"       # MCP 工具名称
 ```
 
 需要先在 `[mcp_servers]` 中配置对应的 MCP server。完整示例：
@@ -444,7 +444,7 @@ env = { "Z_AI_MODE" = "ZHIPU" }
 # 启用图片识别
 [image_analysis]
 mcp_server = "zai-mcp-server"
-tool_name = "image_analysis"
+tool_name = "analyze_image"
 ```
 
 | 场景 | 行为 |
@@ -453,4 +453,4 @@ tool_name = "image_analysis"
 | 只配置了 `[image_analysis]` 但 MCP server 不可用 | 图片替换为 `[图片处理失败]` |
 | 未配置 `[image_analysis]` | 图片替换为 `[图片已忽略：当前模型不支持图片输入]` |
 
-> **注意**：`zai-mcp-server` 的 `image_analysis` 工具包含在智谱 Coding Plan 中，不额外收费。其他 MCP 图片识别工具可能产生额外费用，请确认后使用。
+> **注意**：`zai-mcp-server` 的 `analyze_image` 工具包含在智谱 Coding Plan 中，不额外收费。其他 MCP 图片识别工具可能产生额外费用，请确认后使用。

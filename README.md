@@ -1,6 +1,6 @@
 # Codex CLI - China Provider Fork
 
-基于 OpenAI Codex CLI 的 fork，让国内大模型服务商（小米 Mimo、DeepSeek、Kimi Code、火山引擎/豆包 等）可以直接接入 Codex，开箱即用。
+基于 OpenAI Codex CLI 的 fork，让国内大模型服务商（小米 Mimo、DeepSeek、Kimi Code、智谱 GLM、火山引擎/豆包 等）可以直接接入 Codex，开箱即用。
 
 ## 为什么需要这个项目？
 
@@ -291,7 +291,7 @@ model_catalog_json = "/home/用户名/.codex/custom_models.json"
 ```toml
 [image_analysis]
 mcp_server = "zai-mcp-server"
-tool_name = "image_analysis"
+tool_name = "analyze_image"
 ```
 
 ## 国内服务商配置
