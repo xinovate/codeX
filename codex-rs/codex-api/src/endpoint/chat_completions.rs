@@ -955,8 +955,9 @@ fn convert_request_body(responses_body: &mut Value) {
             chat_obj.insert("thinking".to_string(), json!({"type": "enabled"}));
         }
         None => {
-            // No reasoning field or no effort — leave thinking unset,
-            // provider uses its own default (e.g. DeepSeek thinking is on).
+            // Default: enable thinking so models use reasoning_content field
+            // instead of mixing thinking into plain content.
+            chat_obj.insert("thinking".to_string(), json!({"type": "enabled"}));
         }
     }
 
