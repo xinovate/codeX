@@ -408,6 +408,8 @@ impl ModelProviderInfo {
             "deepseek",
             "minimax",
             "moonshot",
+            "mimo",
+            "xiaomi",
         ];
 
         let name_lower = self.name.to_lowercase();
